@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../../data/services/upload_service.dart';
+import '../../data/services/api_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -62,7 +67,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
 }
 
 // ─── Tab : Affichage des infos ────────────────────────────────────────────────
-class _InfoTab extends StatelessWidget {
+/* class _InfoTab extends StatelessWidget {
   final dynamic user;
   final Color roleColor;
   const _InfoTab({required this.user, required this.roleColor});
@@ -129,6 +134,232 @@ class _InfoTab extends StatelessWidget {
               const Text('Solde portefeuille',
                 style: TextStyle(color: Colors.white70, fontSize: 12)),
               Text('${user.balance.toStringAsFixed(0)} ${AppStrings.currency}',
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            ]),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _infoCard(BuildContext context, List<Widget> children) => Container(
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10)],
+    ),
+    child: Column(children: children),
+  );
+
+  Widget _infoRow(IconData icon, String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    child: Row(children: [
+      Icon(icon, color: AppTheme.primaryColor, size: 20),
+      const SizedBox(width: 14),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+      ]),
+    ]),
+  );
+}
+ */
+class _InfoTab extends StatefulWidget {
+  final dynamic user;
+  final Color roleColor;
+  const _InfoTab({required this.user, required this.roleColor});
+
+  @override
+  State<_InfoTab> createState() => _InfoTabState();
+}
+
+class _InfoTabState extends State<_InfoTab> {
+  bool _uploading = false;
+  Key _imageKey = UniqueKey();  
+
+
+  Future<void> _pickAndUploadAvatar() async {
+  final picker = ImagePicker();
+  final image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+  if (image == null) return;
+
+  setState(() => _uploading = true);
+  try {
+    /* final authProvider = context.read<AuthProvider>();
+    
+    // Utilise l'API du provider existant (qui a le token)
+    final api = ApiService();
+    await api.setToken(await SharedPreferences.getInstance().then((prefs) => prefs.getString('auth_token') ?? ''));
+    
+    final uploadService = UploadService(api);
+    final avatarUrl = await uploadService.uploadAvatar(File(image.path));
+    
+    print('✅ Avatar uploaded: $avatarUrl');
+    
+    
+    // Refresh profile
+    await authProvider.refreshProfile(); */
+
+    final api = ApiService();
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+      
+      if (token.isEmpty) throw Exception('No auth token');
+      
+      await api.setToken(token);
+      
+      final uploadService = UploadService(api);
+      final avatarUrl = await uploadService.uploadAvatar(File(image.path));
+      
+      print('✅ Avatar uploaded: $avatarUrl');
+      
+      // Refresh profile
+      final authProvider = context.read<AuthProvider>();
+      await authProvider.refreshProfile();
+      
+      print('👤 New avatar: ${authProvider.currentUser?.avatar}');
+    
+    
+    if (mounted) {
+      // Force rebuild complet
+      setState(() {
+          _imageKey = UniqueKey();  // ← Nouvelle key pour forcer le rebuild
+        });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Photo mise à jour !'), backgroundColor: Colors.green),
+      );
+    }
+  } catch (e) {
+    print('❌ Upload error: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+  setState(() => _uploading = false);
+}
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(children: [
+        // Avatar avec bouton upload
+        Stack(
+          key: _imageKey,
+          children: [
+          Container(
+            width: 100, height: 100,
+            decoration: BoxDecoration(
+              gradient: widget.user.avatar != null && widget.user.avatar!.isNotEmpty 
+                ? null 
+                : AppTheme.blueGoldGradient,
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(
+                color: AppTheme.primaryColor.withOpacity(0.3),
+                blurRadius: 16, offset: const Offset(0, 6))],
+              image: widget.user.avatar != null && widget.user.avatar!.isNotEmpty
+                ? DecorationImage(
+                    image: NetworkImage(
+                      '${widget.user.avatar}?t=${DateTime.now().millisecondsSinceEpoch}',
+                    ),
+                    fit: BoxFit.cover,
+                    onError: (exception, stackTrace) {
+                      print('❌ Image load error: $exception');
+                    },
+                  )
+                : null,
+              ),
+            child: widget.user.avatar == null || widget.user.avatar!.isEmpty
+              ? Center(
+                  child: Text(
+                    widget.user.fullName.isNotEmpty 
+                        ? widget.user.fullName[0].toUpperCase() 
+                        : '?',
+                    style: const TextStyle(
+                      fontSize: 40, 
+                      fontWeight: FontWeight.bold, 
+                      color: Colors.white,
+                    ),
+                  ),
+                )
+              : null,
+          ),
+          if (_uploading)
+            Positioned.fill(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+              ),
+            )
+          else
+            Positioned(
+              bottom: 0, right: 0,
+              child: GestureDetector(
+                onTap: _pickAndUploadAvatar,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: AppTheme.secondaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                ),
+              ),
+            ),
+        ]),
+        
+        const SizedBox(height: 16),
+        Text(widget.user.fullName,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+        const SizedBox(height: 8),
+        
+        // Badge rôle
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: widget.roleColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: widget.roleColor.withOpacity(0.5)),
+          ),
+          child: Text(widget.user.roleLabel,
+            style: TextStyle(color: widget.roleColor, fontWeight: FontWeight.bold, fontSize: 13)),
+        ),
+        const SizedBox(height: 28),
+
+        // Reste inchangé (infos)
+        _infoCard(context, [
+          _infoRow(Icons.alternate_email, "Nom d'utilisateur", widget.user.username),
+          _infoRow(Icons.email_outlined, 'Email', widget.user.email),
+          if (widget.user.phone != null && widget.user.phone!.isNotEmpty)
+            _infoRow(Icons.phone_outlined, 'Téléphone', widget.user.phone!),
+          _infoRow(Icons.verified_outlined, 'Email vérifié', widget.user.isVerified ? 'Oui ✓' : 'Non'),
+          _infoRow(Icons.calendar_today_outlined, 'Membre depuis',
+            '${widget.user.createdAt.day}/${widget.user.createdAt.month}/${widget.user.createdAt.year}'),
+        ]),
+        const SizedBox(height: 16),
+
+        // Solde
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: AppTheme.goldGradient,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(children: [
+            const Icon(Icons.account_balance_wallet, color: Colors.white, size: 28),
+            const SizedBox(width: 14),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Solde portefeuille',
+                style: TextStyle(color: Colors.white70, fontSize: 12)),
+              Text('${widget.user.balance.toStringAsFixed(0)} ${AppStrings.currency}',
                 style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
             ]),
           ]),

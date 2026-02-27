@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucky_day/data/models/models.dart';
+import 'package:lucky_day/screens/raffle/raffle_detail_screen.dart';
 import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/category_provider.dart';
 import '../../providers/raffle_provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -24,6 +26,7 @@ class _RafflesScreenState extends State<RafflesScreen>
   double? _maxPrice;
   String? _categoryId;
   String? _categoryName;
+  bool _hideParticipated = false;
 
   @override
   void initState() {
@@ -43,6 +46,8 @@ class _RafflesScreenState extends State<RafflesScreen>
 
   // Filtre + tri local sur une liste de raffles
   List<Raffle> _apply(List<Raffle> source) {
+    final userParticipations = context.read<RaffleProvider>().myRaffles.map((r) => r.id).toSet();
+
     var list = source.where((r) {
       final matchSearch = _search.isEmpty ||
           r.title.toLowerCase().contains(_search.toLowerCase()) ||
@@ -51,7 +56,10 @@ class _RafflesScreenState extends State<RafflesScreen>
       final matchMax = _maxPrice == null || r.entryPrice <= _maxPrice!;
       final matchCat = _categoryId == null ||
         r.productCategoryId == _categoryId;
-      return matchSearch && matchMin && matchMax && matchCat;
+
+      final matchParticipation = !_hideParticipated || !userParticipations.contains(r.id);
+
+      return matchSearch && matchMin && matchMax && matchCat && matchParticipation;
     }).toList();
 
     switch (_sortBy) {
@@ -75,18 +83,19 @@ class _RafflesScreenState extends State<RafflesScreen>
         currentMax: _maxPrice,
         currentCategoryId:   _categoryId,      
         currentCategoryName: _categoryName,    
-        onApply: (sort, min, max, categoryId, categoryName) {
-          setState(() { _sortBy = sort; _minPrice = min; _maxPrice = max; _categoryId   = categoryId; _categoryName = categoryName; });
+        currentHideParticipated: _hideParticipated,
+        onApply: (sort, min, max, categoryId, categoryName, hideParticipated) {
+          setState(() { _sortBy = sort; _minPrice = min; _maxPrice = max; _categoryId   = categoryId; _categoryName = categoryName; _hideParticipated = hideParticipated;});
         },
         onReset: () {
-          setState(() { _sortBy = null; _minPrice = null; _maxPrice = null; _categoryId = null; _categoryName = null; });
+          setState(() { _sortBy = null; _minPrice = null; _maxPrice = null; _categoryId = null; _categoryName = null; _hideParticipated = false;});
         },
       ),
     );
   }
 
 bool get _hasActiveFilters =>
-    _sortBy != null || _minPrice != null || _maxPrice != null || _categoryId != null;
+    _sortBy != null || _minPrice != null || _maxPrice != null || _categoryId != null || _hideParticipated;
 
   @override
   Widget build(BuildContext context) {
@@ -193,10 +202,13 @@ bool get _hasActiveFilters =>
                 if (_categoryId != null)
                   _filterChip(_categoryName ?? 'Catégorie',
                       () => setState(() { _categoryId = null; _categoryName = null; })),
+                if (_hideParticipated)
+                  _filterChip('Masquer mes participations',
+                    () => setState(() => _hideParticipated = false)),
                 if (_hasActiveFilters)
                   TextButton(
                     onPressed: () => setState(() {
-                      _sortBy = null; _minPrice = null; _maxPrice = null;
+                      _sortBy = null; _minPrice = null; _maxPrice = null; _hideParticipated = false;
                     }),
                     child: const Text('Tout effacer',
                         style: TextStyle(fontSize: 12, color: Colors.red)),
@@ -208,6 +220,7 @@ bool get _hasActiveFilters =>
           Expanded(
             child: Consumer<RaffleProvider>(
               builder: (_, prov, __) {
+                
                 if (prov.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -244,6 +257,8 @@ bool get _hasActiveFilters =>
   Widget _buildTab(RaffleProvider prov, String type) {
     final raffles = _apply(prov.byProbability(type));
     final winners = prov.recentWinners(type);
+    final userParticipations = prov.myRaffles.map((r) => r.id).toSet();
+
 
     return RefreshIndicator(
       onRefresh: () => prov.fetchAll(),
@@ -298,10 +313,36 @@ bool get _hasActiveFilters =>
                   ),
                 )
               : SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) => RaffleCard(raffle: raffles[i], onTap: () {}),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) {
+                      final raffle = raffles[i];
+                      // ✅ Vérifier si l'utilisateur participe déjà
+                      final isParticipating = userParticipations.contains(raffle.id);
+                      
+                      return RaffleCard(
+                        raffle: raffle,
+                        isParticipating: isParticipating, 
+                        onTap: () => 
+                          //if (isParticipating) {
+                            // Si déjà participant, naviguer vers les détails
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RaffleDetailScreen(raffle: raffle),
+                              ),
+                            ),
+                            onParticipate: isParticipating
+                            ? null // Pas de bouton si déjà participant
+                            : () => _showParticipateSheet(context, raffle),
+                          //} else {
+                            // Sinon, ouvrir la sheet de participation
+                          //  _showParticipateSheet(context, raffle);
+                          //}
+                        
+                      );
+                    },
                       childCount: raffles.length,
                     ),
                   ),
@@ -324,6 +365,15 @@ bool get _hasActiveFilters =>
     ),
   );
 
+  void _showParticipateSheet(BuildContext context, Raffle raffle) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => _ParticipateSheet(raffle: raffle),
+    );
+  }
   String _sortLabel(String sort) {
     switch (sort) {
       case 'price_asc':  return 'Prix ↑';
@@ -343,8 +393,9 @@ class _FilterSheet extends StatefulWidget {
   final VoidCallback onReset;
   final String? currentCategoryId;
   final String? currentCategoryName;
+  final bool currentHideParticipated;
   final void Function(String? sort, double? min, double? max,
-      String? categoryId, String? categoryName) onApply;
+      String? categoryId, String? categoryName, bool hideParticipated,) onApply;
   
   const _FilterSheet({
     required this.currentSort,
@@ -353,6 +404,7 @@ class _FilterSheet extends StatefulWidget {
     required this.onApply,
     required this.onReset,
     this.currentCategoryId,
+    required this.currentHideParticipated,
     this.currentCategoryName,
   });
 
@@ -364,6 +416,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   String? _sort;
   String? _categoryId;
   String? _categoryName;
+  bool _hideParticipated = false;
   final _minCtrl = TextEditingController();
   final _maxCtrl = TextEditingController();
 
@@ -375,6 +428,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     if (widget.currentMax != null) _maxCtrl.text = widget.currentMax!.toInt().toString();
     _categoryId = widget.currentCategoryId;
     _categoryName = widget.currentCategoryName;
+    _hideParticipated = widget.currentHideParticipated; 
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
     context.read<CategoryProvider>().fetchProductCategories();
@@ -413,6 +467,65 @@ class _FilterSheetState extends State<_FilterSheet> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold,
                   color: AppTheme.textPrimary)),
           const SizedBox(height: 20),
+          // ── Masquer participations ─────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _hideParticipated
+                  ? AppTheme.primaryColor.withOpacity(0.08)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _hideParticipated
+                    ? AppTheme.primaryColor.withOpacity(0.3)
+                    : Colors.grey.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _hideParticipated ? Icons.visibility_off : Icons.visibility,
+                  color: _hideParticipated
+                      ? AppTheme.primaryColor
+                      : AppTheme.textSecondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Masquer mes participations',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: _hideParticipated
+                              ? AppTheme.primaryColor
+                              : AppTheme.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Ne montrer que les tombolas disponibles',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _hideParticipated,
+                  onChanged: (v) => setState(() => _hideParticipated = v),
+                  activeColor: AppTheme.primaryColor,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
 
           // ── Tri ─────────────────────────────────────────────────────────
           const Text('Trier par',
@@ -536,7 +649,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                     _minCtrl.text.isNotEmpty ? double.tryParse(_minCtrl.text) : null,
                     _maxCtrl.text.isNotEmpty ? double.tryParse(_maxCtrl.text) : null,
                     _categoryId,      
-                    _categoryName,                     
+                    _categoryName,    
+                    _hideParticipated,                     
                   );
                   Navigator.pop(context);
                 },
@@ -566,6 +680,232 @@ class _FilterSheetState extends State<_FilterSheet> {
           color: selected ? Colors.white : AppTheme.textPrimary,
           fontSize: 13),
       showCheckmark: false,
+    );
+  }
+}
+
+class _ParticipateSheet extends StatefulWidget {
+  final Raffle raffle;
+  const _ParticipateSheet({required this.raffle});
+  @override
+  State<_ParticipateSheet> createState() => _ParticipateSheetState();
+}
+
+class _ParticipateSheetState extends State<_ParticipateSheet> {
+  String _paymentMethod = 'wallet'; // 'wallet' ou 'mobilemoney'
+  bool _processing = false;
+
+  Future<void> _participate() async {
+    setState(() => _processing = true);
+    final prov = context.read<RaffleProvider>();
+    
+    if (_paymentMethod == 'mobilemoney') {
+      // TODO: Backend gère le paiement mobile money
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Paiement mobile money bientôt disponible'),
+            backgroundColor: AppTheme.primaryColor,
+          ),
+        );
+      }
+      setState(() => _processing = false);
+      return;
+    }
+
+    // Paiement par wallet
+    final ok = await prov.participate(widget.raffle.id);
+    
+    if (mounted) {
+      Navigator.pop(context);
+      if (ok) {
+        // Refresh solde
+        context.read<AuthProvider>().refreshProfile();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Participation confirmée ! Bonne chance !'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(prov.errorMessage ?? 'Erreur de participation'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+    setState(() => _processing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().currentUser;
+    final hasSufficientBalance = user != null && user.balance >= widget.raffle.entryPrice;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 20, right: 20, top: 20,
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        // Handle
+        Center(child: Container(
+          width: 40, height: 4,
+          decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2)),
+        )),
+        const SizedBox(height: 16),
+
+        // Titre
+        Row(children: [
+          const Icon(Icons.confirmation_number, color: AppTheme.primaryColor),
+          const SizedBox(width: 10),
+          const Text('Participer à la tombola',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ]),
+        const SizedBox(height: 6),
+        Text(widget.raffle.title,
+          style: AppTheme.bodyText,
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 20),
+
+        // Prix
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: AppTheme.goldGradient,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Prix d\'entrée',
+                style: TextStyle(color: Colors.white70, fontSize: 14)),
+              Text(
+                '${widget.raffle.entryPrice.toStringAsFixed(0)} ${AppStrings.currency}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Méthodes de paiement
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Méthode de paiement',
+            style: TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        ),
+        const SizedBox(height: 12),
+
+        // Wallet
+        _paymentMethodCard(
+          value: 'wallet',
+          icon: Icons.account_balance_wallet,
+          title: 'Portefeuille',
+          subtitle: user != null
+              ? 'Solde: ${user.balance.toStringAsFixed(0)} ${AppStrings.currency}'
+              : 'Non connecté',
+          available: hasSufficientBalance,
+        ),
+        const SizedBox(height: 10),
+
+        // Mobile Money
+        _paymentMethodCard(
+          value: 'mobilemoney',
+          icon: Icons.phone_android,
+          title: 'Mobile Money',
+          subtitle: 'T-Money, Flooz, etc.',
+          available: true,
+        ),
+
+        const SizedBox(height: 24),
+
+        // Bouton
+        ElevatedButton(
+          onPressed: (_processing || (_paymentMethod == 'wallet' && !hasSufficientBalance))
+              ? null
+              : _participate,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryColor,
+          ),
+          child: _processing
+              ? const SizedBox(
+                  width: 24, height: 24,
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : const Text('Confirmer la participation',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+        const SizedBox(height: 20),
+      ]),
+    );
+  }
+
+  Widget _paymentMethodCard({
+    required String value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool available,
+  }) {
+    final selected = _paymentMethod == value;
+    return GestureDetector(
+      onTap: available ? () => setState(() => _paymentMethod = value) : null,
+      child: Opacity(
+        opacity: available ? 1.0 : 0.5,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? AppTheme.primaryColor.withOpacity(0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? AppTheme.primaryColor : Colors.grey.withOpacity(0.3),
+              width: selected ? 2 : 1,
+            ),
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppTheme.primaryColor.withOpacity(0.15)
+                    : Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon,
+                  color: selected ? AppTheme.primaryColor : AppTheme.textSecondary,
+                  size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: selected ? AppTheme.primaryColor : AppTheme.textPrimary)),
+                const SizedBox(height: 3),
+                Text(subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: available
+                        ? AppTheme.textSecondary
+                        : Colors.red)),
+              ],
+            )),
+            if (selected)
+              const Icon(Icons.check_circle, color: AppTheme.primaryColor, size: 22),
+          ]),
+        ),
+      ),
     );
   }
 }

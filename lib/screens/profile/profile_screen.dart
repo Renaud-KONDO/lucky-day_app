@@ -58,26 +58,39 @@ class ProfileScreen extends StatelessWidget {
                 child: SafeArea(
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     const SizedBox(height: 24),
-                    Stack(
-                      children: [
-                        CircleAvatar(
-                          radius: 40,
-                          backgroundColor: Colors.white.withOpacity(0.3),
-                          child: Text(
-                            user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-                            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
-                          ),
-                        ),if (user.isVerified)
-                          Positioned(bottom: 0, right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                              child: const Icon(Icons.check, color: Colors.white, size: 12),
+                   Stack(
+                    children: [
+                      // Image avec cache-busting
+                      user.avatar != null && user.avatar!.isNotEmpty
+                        ? CircleAvatar(
+                            radius: 44,
+                            backgroundColor: Colors.white.withOpacity(0.3),
+                            backgroundImage: NetworkImage(
+                              '${user.avatar}?t=${DateTime.now().millisecondsSinceEpoch}',
+                            ),
+                            onBackgroundImageError: (exception, stackTrace) {
+                              print('❌ Avatar load error: $exception');
+                            },
+                          )
+                        : CircleAvatar(
+                            radius: 44,
+                            backgroundColor: Colors.white.withOpacity(0.3),
+                            child: Text(
+                              user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+                              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
                           ),
-                          ],
-                    ),
-                    const SizedBox(height: 12),
+                      if (user.isVerified)
+                        Positioned(bottom: 0, right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                            child: const Icon(Icons.check, color: Colors.white, size: 12),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                     Text(user.fullName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     Text(user.email, style: const TextStyle(color: Colors.white70, fontSize: 13)),
