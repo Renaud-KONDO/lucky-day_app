@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logger/web.dart';
 import '../data/models/models.dart';
 import '../core/theme/app_theme.dart';
 import '../core/constants/app_constants.dart';
@@ -49,7 +50,7 @@ class WinnersBanner extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
               itemCount: winners.length,
               separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (_, i) => _WinnerChip(raffle: winners[i]),
+              itemBuilder: (_, i) => _WinnerChip(raffle: winners[i]), 
             ),
           ),
         ],

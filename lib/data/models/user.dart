@@ -4,6 +4,7 @@ class User {
   final String id;
   final String fullName;
   final String email;
+  final String username;
   final String? phone;
   final String? avatar;
   final String role; // gambler, store_owner, admin, super_admin
@@ -16,6 +17,7 @@ class User {
     required this.id,
     required this.fullName,
     required this.email,
+    required this.username,
     this.phone,
     this.avatar,
     this.role = 'gambler',
@@ -43,9 +45,10 @@ class User {
       id: json['id'] ?? json['_id'] ?? '',
       fullName: json['fullName'] ?? json['name'] ?? '',
       email: json['email'] ?? '',
+      username:    json['username'] ?? '', 
       phone: json['phone'],
-      avatar: json['avatar'],
-      role:        json['role'] ?? 'gambler',
+      avatar:      json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'],
+      role:        json['role'] ?? 'gambler',                                
       balance: AppUtils.parseDouble(json['wallet']?['balance'] ?? json['balance'] ?? 0),
       isVerified:  json['isVerified'] ?? false,
       isActive:    json['isActive'] ?? true,
@@ -57,16 +60,21 @@ class User {
     'id': id,
     'fullName': fullName,
     'email': email,
+    'username': username,        
     'phone': phone,
-    'avatar': avatar,
+    'avatarUrl': avatar,             
+    'role': role,                 
     'balance': balance,
+    'isVerified': isVerified,
+    'isActive': isActive,
     'createdAt': createdAt.toIso8601String(),
   };
 
-  User copyWith({String? fullName, String? phone, String? avatar}) => User(
+  User copyWith({String? fullName, String? phone, String? avatar, String? username}) => User(
     id: id, email: email, role: role, balance: balance,
     isVerified: isVerified, isActive: isActive, createdAt: createdAt,
     fullName: fullName ?? this.fullName,
+    username: username ?? this.username,
     phone: phone ?? this.phone,
     avatar: avatar ?? this.avatar,
   );

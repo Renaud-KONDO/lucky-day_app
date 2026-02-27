@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../../core/constants/app_constants.dart';
@@ -42,6 +44,28 @@ class StoreRepository {
     final res = await _api.put('${AppConstants.stores}/$id', data: data);
     return Store.fromJson(res.data['data']);
   }
+
+  /// Créer un store et retourner l'objet
+  Future<Store> createStoreAndReturn(Map<String, dynamic> data) async {
+    print('🔵 Repository: Creating store with data: $data');
+    
+    try {
+      final res = await _api.post('/stores', data: data);
+      print('✅ Repository: Store created successfully');
+      print('📦 Response data: ${res.data}');
+      
+      return Store.fromJson(res.data['data']);
+    } catch (e) {
+      print('❌ Repository error: $e');
+      
+      if (e is DioException) {
+        print('📛 Status: ${e.response?.statusCode}');
+        print('📛 Response: ${e.response?.data}');
+      }
+      
+      rethrow;
+    }
+  }
 }
 
 class ProductRepository {
@@ -66,4 +90,5 @@ class ProductRepository {
     final list = (res.data['data'] ?? []) as List;
     return list.map((e) => Raffle.fromJson(e)).toList();
   }
+  
 }

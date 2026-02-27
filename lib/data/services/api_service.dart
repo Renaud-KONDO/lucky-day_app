@@ -3,7 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
 
 class ApiService {
-  late Dio _dio;
+  late final Dio _dio;
+  Dio get dio => _dio;
 
   ApiService() {
     _dio = Dio(BaseOptions(

@@ -74,6 +74,19 @@ class Product {
     storeId: json['storeId'],
     isActive: json['isActive'] ?? true,
   );
+
+
+
+/*   Map<String, dynamic> toJson() => {
+    'id': id,
+    'storeId': storeId,
+    'name': name,
+    'description': description,
+    'price': price,
+    'imageUrls': imageUrls,
+    'isActive': isActive,
+  };
+ */
 }
 
 // ─── Raffle ───────────────────────────────────────────────────────────────────
@@ -98,6 +111,11 @@ class Raffle {
   final DateTime createdAt;
   final String? productCategoryId;    
   final String? productCategoryName;  
+  final bool autoDrawEnabled;
+  final String? autoDrawType;            // 'instant' ou 'scheduled'
+  final DateTime? autoDrawAt;            // pour scheduled
+  final int? autoDrawDelayMinutes;       // pour instant
+  final DateTime? autoDrawTriggeredAt;
 
   Raffle({
     required this.id,
@@ -119,7 +137,12 @@ class Raffle {
     this.drawDate,
     required this.createdAt,
     this.productCategoryId,           
-    this.productCategoryName,         
+    this.productCategoryName, 
+    this.autoDrawEnabled = false,
+    this.autoDrawType,
+    this.autoDrawAt,
+    this.autoDrawDelayMinutes,
+    this.autoDrawTriggeredAt,        
   });
 
   double get fillPercentage =>
@@ -156,9 +179,44 @@ class Raffle {
     createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
     productCategoryId:   json['product']?['categoryId'] ?? json['productCategoryId'],
     productCategoryName: json['product']?['category']?['name'] ?? json['productCategoryName'],
+    autoDrawEnabled:      json['autoDrawEnabled'] ?? false,
+    autoDrawType:         json['autoDrawType'],
+    autoDrawAt:           json['autoDrawAt'] != null ? DateTime.tryParse(json['autoDrawAt']) : null,
+    autoDrawDelayMinutes: json['autoDrawDelayMinutes'],
+    autoDrawTriggeredAt:  json['autoDrawTriggeredAt'] != null ? DateTime.tryParse(json['autoDrawTriggeredAt']) : null,
 
   );
+
+  // Ajoute cette méthode à la fin de ta classe
+  /* Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'description': description,
+    'raffleType': raffleType,
+    'probabilityType': probabilityType,
+    'entryPrice': entryPrice,
+    'maxParticipants': maxParticipants,
+    'currentParticipants': currentParticipants,
+    'status': status,
+    'cashOptionAvailable': cashOptionAvailable,
+    'cashAmount': cashAmount,
+    'winnerId': winnerId,
+    'winnerName': winnerName,
+    'imageUrl': imageUrl,
+    'product': product?.toJson(),  // Assure-toi que Product a aussi une méthode toJson()
+    'storeId': storeId,
+    'drawDate': drawDate?.toIso8601String(),
+    'createdAt': createdAt.toIso8601String(),
+    'productCategoryId': productCategoryId,
+    'productCategoryName': productCategoryName,
+    'autoDrawEnabled': autoDrawEnabled,
+    'autoDrawType': autoDrawType,
+    'autoDrawAt': autoDrawAt?.toIso8601String(),
+    'autoDrawDelayMinutes': autoDrawDelayMinutes,
+    'autoDrawTriggeredAt': autoDrawTriggeredAt?.toIso8601String(),
+  }; */
 }
+
 
 class Category {
   final String id;

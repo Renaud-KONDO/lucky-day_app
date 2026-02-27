@@ -4,13 +4,15 @@ class AppTheme {
   // Couleurs principales Lucky Day
   static const Color primaryColor   = Color(0xFF1E3A8A); // Bleu foncé
   static const Color secondaryColor = Color(0xFFD4AF37); // Or
-  static const Color accentColor    = Color(0xFFFFD700); // Or brillant
+  //static const Color accentColor    = Color(0xFFFFD700); // Or brillant
+  static const Color accentColor    = Color(0xCCFFAB40); // Or brillant avec transparence
   static const Color blueLight      = Color(0xFF3B82F6);
   static const Color goldLight      = Color(0xFFFFC107);
   static const Color goldDark       = Color(0xFFB8860B);
 
   // Probabilités
-  static const Color highProbabilityColor   = Color(0xFFFFD700);
+  //static const Color highProbabilityColor   = Color(0xFFFFD700);
+  static const Color highProbabilityColor   = Color(0xCCFFAB40);
   static const Color mediumProbabilityColor = Color(0xFF3B82F6);
   static const Color lowProbabilityColor    = Color(0xFF64748B);
 

@@ -26,8 +26,9 @@ class AppConstants {
   static const String raffleDraw = '/draw';
   static const String raffleClaim = '/claim';
   static const String raffleCancel = '/cancel';
-  static const String myRaffles = '/raffles/my/raffles';
+  static const String myRaffles = '/raffles/my/participations';
   static const String myWins = '/raffles/my/wins';
+  //static const String  userRaffles = "/user/:userId/created";
 
   // Categories
   static const String storeCategories = '/store-categories';
@@ -54,7 +55,7 @@ class AppConstants {
   // Raffle status
   static const String raffleStatusOpen = 'open';
   static const String raffleStatusFull = 'full';
-  static const String raffleStatusDrawn = 'drawn';
+  static const String raffleStatusDrawn = 'completed';
   static const String raffleStatusClaimed = 'claimed';
   static const String raffleStatusCancelled = 'cancelled';
 
@@ -65,6 +66,25 @@ class AppConstants {
   //users
   static const String users = '/users';
 
+  // Username
+  static const String checkUsername    = '/auth/check-username';
+  static const String suggestUsernames = '/auth/suggest-usernames';
+
+  // Upload
+  static const String uploadAvatar         = '/upload/avatar';
+  static const String uploadStoreLogo      = '/upload/stores';      // + /{storeId}/logo
+  static const String uploadStoreBanner    = '/upload/stores';      // + /{storeId}/banner
+  static const String uploadProductImages  = '/upload/products';    // + /{productId}/images
+  static const String deleteProductImage   = '/upload/products';
+
+// Notifications
+  static const String notificationsRegister   = '/notifications/register';
+  static const String notificationsUnregister = '/notifications/unregister';
+  static const String myNotifications         = '/my-notifications';
+  static const String myNotificationsUnreadCount = '/my-notifications/unread-count';
+  static const String myNotificationsMarkRead = '/my-notifications';  // + /{id}/read
+  static const String myNotificationsMarkAllRead = '/my-notifications/mark-all-read';
+  
 }
 
 class AppStrings {
@@ -99,4 +119,5 @@ class AppStrings {
   // Wallet
   static const String wallet = 'Portefeuille';
   static const String balance = 'Solde';
-}
+
+  }

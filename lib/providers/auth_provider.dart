@@ -6,6 +6,8 @@ import '../data/models/user.dart';
 import '../data/services/api_service.dart';
 import '../core/constants/app_constants.dart';
 import 'package:logger/logger.dart';
+import '../data/services/notification_service.dart';
+
 
 
 class AuthProvider with ChangeNotifier {
@@ -36,6 +38,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> _saveUser(User user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AppConstants.userKey, jsonEncode(user.toJson()));
+
   }
 
   Future<bool> login(String email, String password) async {
@@ -43,19 +46,23 @@ class AuthProvider with ChangeNotifier {
     try {
       final res = await _api.post(AppConstants.authLogin, data: {'email': email, 'password': password});
       final data = res.data['data'];
-      logger.i("here is the received data from backend : $data");
+      //logger.i("here is the received data from backend : $data");
       await _api.setToken(data['accessToken'] ?? data['token']);
-      logger.i("\n setToken success !!! ");
-      logger.i("\n let's log the returned user. \n returned user : $data['user']");
+      //logger.i("\n setToken success !!! ");
+      //logger.i("\n let's log the returned user. \n returned user : $data['user']");
       _user = User.fromJson(data['user']);
-      logger.i("user var set successfully");
+      //logger.i("user var set successfully");
       await _saveUser(_user!);
-      logger.i("user saved successfully");
+      //logger.i("user saved successfully");
+
+      // ✅ Enregistrer le token FCM une seule fois après login
+      await NotificationService.instance.registerToken();
+
       _loading = false; notifyListeners();
       return true;
     } catch (e) {
       //_error = 'Email ou mot de passe incorrect';
-      //logger.e("error encoutered : $e");
+      //logger.e("error encoutered : $e")
       _loading = false; notifyListeners();
 
       if (e is DioException) {
@@ -78,39 +85,69 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> register({required String email, required String password, required String fullName, String? phone}) async {
+  Future<bool> register({
+    required String email,
+    required String password,
+    required String fullName,
+    String? phone,
+    String? username,  // ← ajouter
+  }) async {
     _loading = true; _error = null; notifyListeners();
     try {
-      final body = {'email': email, 'password': password, 'fullName': fullName};
+      final body = {
+        'email': email,
+        'password': password,
+        'fullName': fullName,
+      };
       if (phone != null && phone.isNotEmpty) body['phone'] = phone;
-      final res = await _api.post(AppConstants.authRegister, data: body);
+      if (username != null && username.isNotEmpty) body['username'] = username;  // ← ajouter
+      
+      final res  = await _api.post(AppConstants.authRegister, data: body);
       final data = res.data['data'];
       await _api.setToken(data['accessToken'] ?? data['token']);
       _user = User.fromJson(data['user']);
       await _saveUser(_user!);
-      _loading = false; notifyListeners();
+      // ✅ Enregistrer le token FCM une seule fois après login
+      await NotificationService.instance.registerToken();
+
+      _loading = false; notifyListeners(); 
+      
       return true;
     } catch (e) {
-      //_error = "Erreur lors de l'inscription";
-      _loading = false; notifyListeners();
-
-      if (e is DioException) {
-        final responseData = e.response?.data;
-        if (responseData is Map<String, dynamic>) {
-          if(responseData['message'] == "Email already registered"){
-            _error = "Cet email est déjà utilisé.";
-          }else if(responseData['message'] == "Your IP has been temporarily blocked due to suspicious activity. Please try again later or contact support."){
-             _error = "Votre adresse IP a été temporairement bloquée en raison d'une activité suspecte. Veuillez réessayer plus tard ou contacter le support.";
-          }else{
-            _error = "Erreur lors de l'inscription";
-          }
-        } else {
-          _error = "Erreur lors de l'inscription";
-        }
+      final msg = e.toString();
+      if (msg.contains('Username already taken')) {
+        _error = "Ce nom d'utilisateur est déjà pris";
+      } else if (msg.contains('Username')) {
+        _error = "Nom d'utilisateur invalide (3-30 caractères, minuscules, _ et chiffres)";
       } else {
         _error = "Erreur lors de l'inscription";
       }
+      _loading = false; notifyListeners(); return false;
+    }
+  }
+
+  // ← Ajouter ces méthodes
+  Future<bool> checkUsername(String username) async {
+    try {
+      final res = await _api.get(
+        '${AppConstants.checkUsername}/$username',
+      );
+      return res.data['data']['available'] == true;
+    } catch (_) {
       return false;
+    }
+  }
+
+  Future<List<String>> getSuggestedUsernames(String fullName) async {
+    try {
+      final res = await _api.post(
+        AppConstants.suggestUsernames,
+        data: {'fullName': fullName},
+      );
+      final list = res.data['data']['suggestions'] as List;
+      return list.map((e) => e.toString()).toList();
+    } catch (_) {
+      return [];
     }
   }
 
@@ -142,6 +179,8 @@ class AuthProvider with ChangeNotifier {
   }  
 
   Future<void> logout() async {
+    await NotificationService.instance.unregisterToken();
+
     await _api.clearToken();
     _user = null;
     notifyListeners();
@@ -150,10 +189,16 @@ class AuthProvider with ChangeNotifier {
   Future<void> refreshProfile() async {
     try {
       final res = await _api.get(AppConstants.authProfile);
-      _user = User.fromJson(res.data['data']);
+      final userData = res.data['data'];
+      _user = User.fromJson(userData);
       await _saveUser(_user!);
       notifyListeners();
-    } catch (_) {}
+      
+      print('✅ Profile refreshed successfully');
+      print('👤 New user data: ${_user?.toJson()}');
+    } catch (e) {
+      print('❌ Error refreshing profile: $e');
+    }
   }
 
   void clearError() { _error = null; notifyListeners(); }
