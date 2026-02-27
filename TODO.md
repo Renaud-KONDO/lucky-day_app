@@ -1,31 +1,24 @@
 # Fixing Errors Plan
 
-## Errors Identified
+## Errors Fixed
 
-### 1. lib/screens/raffle/raffles_screen.dart
-**Critical Errors:**
-- **Duplicate `onApply` parameter in `_FilterSheet` class**: Two `onApply` parameters with different signatures defined - this will cause a compile error
-  - Line: `final void Function(String? sort, double? min, double? max) onApply;`
-  - Line: `final void Function(String? sort, double? min, double? max, String? categoryId, String? categoryName) onApply;`
-  
-- **Undefined variables in `_openFilters` method**: `catId` and `catName` are used but not defined
-  - Should be `categoryId` and `categoryName` from the callback parameters
-  
-- **Constructor issue**: `currentCategoryId` and `currentCategoryName` parameters in constructor are not properly handled
+### 1. lib/main.dart
+**Fixed:**
+- Removed duplicate `NotificationProvider` that was added twice on line 51
+- Fixed `fetchMyCreatedRaffles()` call to include required `userId` parameter
 
-### 2. lib/providers/raffle_provider.dart
-- Redundant imports from logger package (was already fixed - one import was commented out)
+### 2. lib/screens/raffle/my_raffles_screen.dart
+**Fixed:**
+- Fixed `_CreatedRafflesTab` onRefresh callback to use function syntax: `() => prov.fetchMyCreatedRaffles(auth.currentUser!.id)`
+- Fixed `_cancelRaffle()` method to pass `userId` to `cancelRaffle(raffle.id, userId)`
+- Fixed `_drawWinner()` method to pass `userId` to `drawWinner(raffle.id, userId)`
+- Added `AuthProvider` context access to get current user ID in both methods
 
-## Fix Plan
+### 3. lib/providers/raffle_provider.dart
+**Status:** No issues found - imports are correct
 
-### Step 1: Fix raffles_screen.dart
-- [x] Remove duplicate `onApply` parameter definition - keep only the one with category parameters
-- [x] Fix undefined variables in `_openFilters` method (catId -> categoryId, catName -> categoryName)
-- [x] Fix constructor to properly handle currentCategoryId and currentCategoryName
-
-### Step 2: Fix raffle_provider.dart  
-- [x] Remove redundant import (keep only `import 'package:logger/logger.dart';`) - Already fixed
-
-## Dependencies
-- No new dependencies needed
-- All files are part of the existing codebase
+## Summary
+All identified compile errors have been fixed:
+- ✅ Duplicate NotificationProvider removed from main.dart
+- ✅ Method signature mismatches fixed in my_raffles_screen.dart
+- ✅ All required parameters now properly passed to provider methods
