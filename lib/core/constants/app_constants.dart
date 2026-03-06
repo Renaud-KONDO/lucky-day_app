@@ -69,6 +69,7 @@ class AppConstants {
   // Username
   static const String checkUsername    = '/auth/check-username';
   static const String suggestUsernames = '/auth/suggest-usernames';
+  static const String changeUsername = '/auth/username/change';
 
   // Upload
   static const String uploadAvatar         = '/upload/avatar';
