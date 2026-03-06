@@ -26,4 +26,22 @@ class AppNotification {
     createdAt: DateTime.tryParse(json['createdAt'] ?? '') ?? DateTime.now(),
     data:      json['data'],
   );
+
+  String getIcon() {
+    switch (type) {
+      case 'winner':
+        return '🎉';
+      case 'participation':
+        return '🎫';
+      case 'raffle_completed':
+        return '🎲';
+      case 'raffle_cancelled':
+        return '❌';
+      case 'wallet_credit':
+      case 'wallet_debit':
+        return '💰';
+      default:
+        return '🔔';
+    }
+  }
 }
