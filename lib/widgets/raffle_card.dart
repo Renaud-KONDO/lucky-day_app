@@ -328,7 +328,7 @@ class RaffleCard extends StatelessWidget {
                               size: 20, color: AppTheme.primaryColor),
                           const SizedBox(width: 8),
                           Text(
-                            'Vous êtes le champion de cette tombola ! Félicitations ✨',
+                            'Tombola gagnée ! Félicitations ✨',
                             style: TextStyle(
                               color: AppTheme.primaryColor,
                               fontWeight: FontWeight.bold,
@@ -338,15 +338,15 @@ class RaffleCard extends StatelessWidget {
                         ],
                       ),
                     )else if(isParticipating && raffle.status == 'completed' && !isWon)
-                    // Badge "GAGNÉ"
+                    // Badge "PERDU"
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            AppTheme.primaryColor.withOpacity(0.1),
-                            AppTheme.primaryColor.withOpacity(0.05),
+                            const Color.fromARGB(255, 65, 65, 65).withOpacity(0.4),
+                            const Color.fromARGB(255, 59, 59, 59).withOpacity(0.2),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(12),
@@ -358,11 +358,11 @@ class RaffleCard extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.emoji_events,
+                          Icon(Icons.trending_down,
                               size: 20, color: AppTheme.primaryColor),
                           const SizedBox(width: 8),
                           Text(
-                            'Tombola terminéé ! Ne perdez pas espoir. Tentez votre chance sur d\'autres tombola 🍀',
+                            'Tombola Perdue ! Ne perdez pas espoir 🍀',
                             style: TextStyle(
                               color: AppTheme.primaryColor,
                               fontWeight: FontWeight.bold,

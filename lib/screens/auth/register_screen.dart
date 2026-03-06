@@ -20,6 +20,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _checkingUsername = false;
   bool _usernameAvailable = false;
   List<String> _suggestions = [];
+  String? _suggestion;
 
   @override
   void dispose() {
@@ -28,8 +29,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _onNameChanged() async {
+  /* void _onNameChanged() async {
     if (_nameCtrl.text.trim().length < 3) return;
+    final auth = context.read<AuthProvider>();
+    final suggestions = await auth.getSuggestedUsernames(_nameCtrl.text.trim());
+    if (mounted) {
+      setState(() => _suggestions = suggestions);
+    }
+  } */
+
+  void _onNameChanged() async {
+    if (_nameCtrl.text.trim().length < 3) {
+      setState(() => _suggestions = []);
+      return;
+    }
+
     final auth = context.read<AuthProvider>();
     final suggestions = await auth.getSuggestedUsernames(_nameCtrl.text.trim());
     if (mounted) {
@@ -102,12 +116,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   labelText: 'Nom complet',
                   prefixIcon: Icon(Icons.person_outline)),
                 validator: (v) => v == null || v.trim().length < 2 ? '2 caractères minimum' : null,
-                onChanged: (_) => _onNameChanged(),
+                //onChanged: (_) => _onNameChanged(), // let's deactivate it for now. we need to limit requests
               ),
               
-              const SizedBox(height: 16),
               
-              // Username (optionnel)
+              
+              // Username (optionnel) let's deactivate it for now. we need to limit requests
+              /* const SizedBox(height: 16),
               TextFormField(
                 controller: _usernameCtrl,
                 decoration: InputDecoration(
@@ -129,10 +144,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                 ),
                 onChanged: _onUsernameChanged,
-              ),
+              ), */
               
-              // Suggestions
-              if (_suggestions.isNotEmpty) ...[
+              // Suggestions let's deactivate it for now. we need to limit requests
+              /* if (_suggestions.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -154,7 +169,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     )).toList(),
                   ),
                 ),
-              ],
+              ], */ 
               
               const SizedBox(height: 16),
               

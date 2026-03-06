@@ -372,12 +372,14 @@ class _RaffleDetailScreenState extends State<RaffleDetailScreen> {
               ],
             ),
             child: SafeArea(
-              child: _isParticipating && !_isWon
-                  ? _buildParticipatingBadge()
-                  : _isWon
-                      ? _buildWinningBadge()
-                      : _buildParticipateButton(),
-            ),
+              child: !widget.raffle.canParticipate && _isParticipating && !_isWon
+                  ? _buildLostRaffleBadge()
+                  : widget.raffle.canParticipate && _isParticipating
+                    ? _buildParticipatingBadge()
+                    : _isParticipating && _isWon
+                        ? _buildWinningBadge()
+                        : _buildParticipateButton(),
+              ),
           ),  
     );
   }
@@ -416,6 +418,41 @@ class _RaffleDetailScreenState extends State<RaffleDetailScreen> {
       ),
     );
   }
+
+Widget _buildLostRaffleBadge() {
+  return Container(
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+        const Color.fromARGB(255, 65, 65, 65).withOpacity(0.4),
+        const Color.fromARGB(255, 59, 59, 59).withOpacity(0.2),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: AppTheme.primaryColor.withOpacity(0.3),
+        width: 2,
+      ),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.trending_down,
+            color: AppTheme.primaryColor, size: 24),
+        const SizedBox(width: 12),
+        Text(
+          'Tombola Perdue ! Ne perdez pas espoir 🍀',
+          style: TextStyle(
+            color: AppTheme.primaryColor,
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildWinningBadge() {
     return Container(
@@ -496,6 +533,7 @@ class _ParticipateSheetState extends State<_ParticipateSheet> {
     final prov = context.read<RaffleProvider>();
     
     if (_paymentMethod == 'mobilemoney') {
+      _paymentMethod = "mobile_money";
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -509,7 +547,7 @@ class _ParticipateSheetState extends State<_ParticipateSheet> {
       return;
     }
 
-    final ok = await prov.participate(widget.raffle.id);
+    final ok = await prov.participate(widget.raffle.id, _paymentMethod);
     
     if (mounted) {
       Navigator.pop(context);

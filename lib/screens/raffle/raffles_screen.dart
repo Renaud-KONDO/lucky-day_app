@@ -700,6 +700,7 @@ class _ParticipateSheetState extends State<_ParticipateSheet> {
     final prov = context.read<RaffleProvider>();
     
     if (_paymentMethod == 'mobilemoney') {
+      _paymentMethod = "mobile_money";
       // TODO: Backend gère le paiement mobile money
       if (mounted) {
         Navigator.pop(context);
@@ -715,7 +716,7 @@ class _ParticipateSheetState extends State<_ParticipateSheet> {
     }
 
     // Paiement par wallet
-    final ok = await prov.participate(widget.raffle.id);
+    final ok = await prov.participate(widget.raffle.id, _paymentMethod);
     
     if (mounted) {
       Navigator.pop(context);

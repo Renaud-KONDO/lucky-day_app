@@ -3,7 +3,11 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/raffle_provider.dart';
+import '../../widgets/loading_dialog.dart';
+import '../auth/login_screen.dart';
+import '../notifications/notifications_screen.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 
@@ -91,10 +95,10 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                    Text(user.fullName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text("${user.fullName} || @${user.username}", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     Text(user.email, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 1),
                     // Badge rôle
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -212,29 +216,96 @@ class ProfileScreen extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => const ChangePasswordScreen()))),
                 _menuItem(context, Icons.history, 'Historique des transactions', () {}),
                 const SizedBox(height: 8),
+                
                 _sectionTitle('Préférences'),
-                _menuItem(context, Icons.notifications_outlined, 'Notifications', () {}),
+
+                Consumer<NotificationProvider>(
+                  builder: (context, notificationProvider, _) {
+                    return _menuItem(
+                      context,
+                      Icons.notifications_outlined,
+                      'Notifications',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsScreen(),
+                          ),
+                        );
+                      },
+                      badge: notificationProvider.unreadCount > 0 
+                          ? notificationProvider.unreadCount 
+                          : null,
+                    );
+                  },
+                ),  
+
+                /* Consumer<NotificationProvider>(
+                builder: (context, notificationProvider, _) {
+                  final unreadCount = notificationProvider.unreadCount;
+                  
+                  return ListTile(
+                    leading: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        const Icon(Icons.notifications_outlined, color: AppTheme.primaryColor),
+                        if (unreadCount > 0)
+                          Positioned(
+                            right: -6,
+                            top: -6,
+                            child: Container(
+                              padding: const EdgeInsets.all(5),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  unreadCount > 99 ? '99+' : '$unreadCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    title: const Text('Notifications'),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ), */
+                //_menuItem(context, Icons.notifications_outlined, 'Notifications', () {}),
                 _menuItem(context, Icons.help_outline, 'Aide & Support', () {}),
                 _menuItem(context, Icons.info_outline, 'À propos', () {}),
 
                 const SizedBox(height: 8),
-                _menuItem(context, Icons.logout, 'Déconnexion', () async {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text('Déconnexion'),
-                      content: const Text('Voulez-vous vraiment vous déconnecter ?'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-                        ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Déconnecter')),
-                      ],
-                    ),
-                  );
-                  if (confirm == true && context.mounted) {
-                    await context.read<AuthProvider>().logout();
-                    if (context.mounted) Navigator.pushReplacementNamed(context, '/login');
-                  }
-                }, color: Colors.red),
+                
+                _menuItem(
+                    context,
+                    Icons.logout,
+                    'Déconnexion',
+                    () => _confirmLogout(context),
+                    color: Colors.red,
+                  ),
 
                 const SizedBox(height: 24),
               ]),
@@ -244,6 +315,64 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !context.mounted) return;
+
+    // ✅ Afficher le loader
+    LoadingDialog.show(context, message: 'Déconnexion en cours...');
+
+    try {
+      // Déconnexion
+      await context.read<AuthProvider>().logout();
+
+      if (context.mounted) {
+        // Fermer le loader
+        LoadingDialog.hide(context);
+
+        // Rediriger vers la page de connexion
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      print('❌ Logout error: $e');
+
+      if (context.mounted) {
+        // Fermer le loader
+        LoadingDialog.hide(context);
+
+        // Afficher l'erreur
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la déconnexion: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
 
   Widget _sectionTitle(String title) => Padding(
     padding: const EdgeInsets.fromLTRB(4, 4, 0, 4),
@@ -270,7 +399,7 @@ class ProfileScreen extends StatelessWidget {
     ));
 
   Widget _menuItem(BuildContext context, IconData icon, String label,
-      VoidCallback onTap, {Color? color}) =>
+      VoidCallback onTap, {Color? color, int? badge}) =>
     ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
       leading: Container(
@@ -279,7 +408,42 @@ class ProfileScreen extends StatelessWidget {
           color: (color ?? AppTheme.primaryColor).withOpacity(0.08),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: color ?? AppTheme.primaryColor, size: 20),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(icon, color: color ?? AppTheme.primaryColor, size: 20),
+            if (badge != null && badge > 0)
+              Positioned(
+                right: -12,
+                top: -14,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                    //borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 22,
+                    minHeight: 22,
+                  ),
+                  child: Center(
+                    child: Text(
+                      badge > 99 ? '99+' : '$badge',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        height: 1,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
       title: Text(label, style: TextStyle(
         color: color ?? AppTheme.textPrimary, fontWeight: FontWeight.w500)),
@@ -288,6 +452,8 @@ class ProfileScreen extends StatelessWidget {
         : null,
       onTap: onTap,
     );
+
+
 
     void _showTopUpSheet(BuildContext context) {
       final _amountCtrl = TextEditingController();

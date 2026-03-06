@@ -84,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildProfileIcon(IconData icon, int unreadCount, bool isSelected) {
+  /* Widget _buildProfileIcon(IconData icon, int unreadCount, bool isSelected) {
     return Stack(
       children: [
         Icon(icon, color: isSelected ? AppTheme.primaryColor : null),
@@ -98,6 +98,41 @@ class _HomeScreenState extends State<HomeScreen> {
               decoration: const BoxDecoration(
                 color: Colors.red,
                 shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
+    );
+  } */
+
+  Widget _buildProfileIcon(IconData icon, int unreadCount, bool isSelected) {
+    return Stack(
+      clipBehavior: Clip.none, 
+      children: [
+        Icon(icon, color: isSelected ? AppTheme.primaryColor : null),
+        if (unreadCount > 0)
+          Positioned(
+            right: -8, 
+            top: -4,   
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 18,
+                minHeight: 18,
+              ),
+              child: Text(
+                unreadCount > 99 ? '99+' : '$unreadCount',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ),

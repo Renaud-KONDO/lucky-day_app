@@ -335,7 +335,7 @@ class _InfoTabState extends State<_InfoTab> {
 
         // Reste inchangé (infos)
         _infoCard(context, [
-          _infoRow(Icons.alternate_email, "Nom d'utilisateur", widget.user.username),
+          _infoRow(Icons.alternate_email, "Nom d'utilisateur", widget.user.username, onEdit: () => _showChangeUsernameDialog(context),),
           _infoRow(Icons.email_outlined, 'Email', widget.user.email),
           if (widget.user.phone != null && widget.user.phone!.isNotEmpty)
             _infoRow(Icons.phone_outlined, 'Téléphone', widget.user.phone!),
@@ -378,7 +378,7 @@ class _InfoTabState extends State<_InfoTab> {
     child: Column(children: children),
   );
 
-  Widget _infoRow(IconData icon, String label, String value) => Padding(
+  /* Widget _infoRow(IconData icon, String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     child: Row(children: [
       Icon(icon, color: AppTheme.primaryColor, size: 20),
@@ -389,7 +389,36 @@ class _InfoTabState extends State<_InfoTab> {
         Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
       ]),
     ]),
+  ); */
+
+  Widget _infoRow(IconData icon, String label, String value, {VoidCallback? onEdit}) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    child: Row(children: [
+      Icon(icon, color: AppTheme.primaryColor, size: 20),
+      const SizedBox(width: 14),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+          const SizedBox(height: 2),
+          Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        ]),
+      ),
+      if (onEdit != null)
+        IconButton(
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          color: AppTheme.primaryColor,
+          onPressed: onEdit,
+          tooltip: 'Modifier',
+        ),
+    ]),
   );
+
+  void _showChangeUsernameDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => _ChangeUsernameDialog(currentUsername: widget.user.username),
+    );
+  }
 }
 
 // ─── Tab : Modifier les infos ─────────────────────────────────────────────────
@@ -547,4 +576,525 @@ class _EditTabState extends State<_EditTab> {
         ),
       ),
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DIALOG : CHANGER LE NOM D'UTILISATEUR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/* class _ChangeUsernameDialog extends StatefulWidget {
+  final String currentUsername;
+  const _ChangeUsernameDialog({required this.currentUsername});
+
+  @override
+  State<_ChangeUsernameDialog> createState() => _ChangeUsernameDialogState();
+}
+
+class _ChangeUsernameDialogState extends State<_ChangeUsernameDialog> {
+  final _usernameCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _submitting = false;
+  String? _errorMessage;
+  List<String>? _suggestions;
+
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkAndChangeUsername() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final newUsername = _usernameCtrl.text.trim();
+    if (newUsername == widget.currentUsername) {
+      setState(() {
+        _errorMessage = 'Ce nom d\'utilisateur est déjà le vôtre';
+        _suggestions = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+      _suggestions = null;
+    });
+
+    try {
+      final auth = context.read<AuthProvider>();
+      final ok = await auth.changeUsername(newUsername);
+
+      if (ok) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Nom d\'utilisateur modifié avec succès !'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        // ✅ Le backend a renvoyé une erreur avec des suggestions
+        setState(() {
+          _errorMessage = auth.errorMessage ?? 'Nom d\'utilisateur non disponible';
+          
+          // ✅ Récupérer les suggestions si disponibles
+          // (on suppose que le backend renvoie un format spécifique)
+          _suggestions = auth.usernameSuggestions;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Erreur de connexion';
+        _suggestions = null;
+      });
+    }
+
+    setState(() => _submitting = false);
+  }
+
+  void _selectSuggestion(String suggestion) {
+    _usernameCtrl.text = suggestion;
+    setState(() {
+      _errorMessage = null;
+      _suggestions = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Titre
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.alternate_email,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Changer de nom d\'utilisateur',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Actuel : @${widget.currentUsername}',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Champ de saisie
+              TextFormField(
+                controller: _usernameCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Nouveau nom d\'utilisateur',
+                  hintText: 'Ex: john_doe',
+                  prefixText: '@',
+                  prefixIcon: const Icon(Icons.person_outline),
+                  errorText: _errorMessage,
+                  helperText: '3-20 caractères, lettres, chiffres, underscore',
+                  helperMaxLines: 2,
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Nom d\'utilisateur requis';
+                  }
+                  if (v.trim().length < 3) {
+                    return 'Minimum 3 caractères';
+                  }
+                  if (v.trim().length > 20) {
+                    return 'Maximum 20 caractères';
+                  }
+                  if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(v.trim())) {
+                    return 'Uniquement lettres, chiffres et underscore';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // ✅ Suggestions si le nom est déjà pris
+              if (_suggestions != null && _suggestions!.isNotEmpty) ...[
+                const Text(
+                  'Suggestions disponibles :',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _suggestions!.map((suggestion) {
+                    return ActionChip(
+                      label: Text('@$suggestion'),
+                      avatar: const Icon(Icons.check_circle_outline, size: 16),
+                      onPressed: () => _selectSuggestion(suggestion),
+                      backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
+                      side: BorderSide(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Info box
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withOpacity(0.2),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16, color: AppTheme.primaryColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Votre nom d\'utilisateur sera vérifié avant d\'être changé',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Boutons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _submitting ? null : () => Navigator.pop(context),
+                      child: const Text('Annuler'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _submitting ? null : _checkAndChangeUsername,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text('Valider'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+ */
+// ═══════════════════════════════════════════════════════════════════════════════
+// DIALOG : CHANGER LE NOM D'UTILISATEUR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+class _ChangeUsernameDialog extends StatefulWidget {
+  final String currentUsername;
+  const _ChangeUsernameDialog({required this.currentUsername});
+
+  @override
+  State<_ChangeUsernameDialog> createState() => _ChangeUsernameDialogState();
+}
+
+class _ChangeUsernameDialogState extends State<_ChangeUsernameDialog> {
+  final _usernameCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _checkAndChangeUsername() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final newUsername = _usernameCtrl.text.trim();
+    
+    // ✅ Vérifier si c'est le même username
+    if (newUsername == widget.currentUsername) {
+      // Mettre à jour manuellement l'erreur dans le provider
+      final auth = context.read<AuthProvider>();
+      auth.setUsernameError('Ce nom d\'utilisateur est déjà le vôtre');
+      return;
+    }
+
+    setState(() => _submitting = true);
+
+    try {
+      final auth = context.read<AuthProvider>();
+      final ok = await auth.changeUsername(newUsername);
+
+      if (ok && mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Nom d\'utilisateur modifié avec succès !'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Dialog error: $e');
+    }
+
+    if (mounted) {
+      setState(() => _submitting = false);
+    }
+  }
+
+  void _selectSuggestion(String suggestion) {
+    _usernameCtrl.text = suggestion;
+    // ✅ Nettoyer l'erreur quand on sélectionne une suggestion
+    context.read<AuthProvider>().clearUsernameError();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          // ✅ Écouter les changements du provider
+          child: Consumer<AuthProvider>(
+            builder: (_, auth, __) {
+              final errorMessage = auth.errorMessage;
+              final suggestions = auth.usernameSuggestions ?? [];
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Titre
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.alternate_email,
+                          color: AppTheme.primaryColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Changer de nom d\'utilisateur',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Actuel : @${widget.currentUsername}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Champ de saisie
+                  TextFormField(
+                    controller: _usernameCtrl,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: 'Nouveau nom d\'utilisateur',
+                      hintText: 'Ex: john_doe',
+                      prefixText: '@',
+                      prefixIcon: const Icon(Icons.person_outline),
+                      // ✅ Afficher l'erreur du provider
+                      errorText: errorMessage,
+                      errorMaxLines: 2,
+                      helperText: '3-20 caractères, lettres, chiffres, underscore',
+                      helperMaxLines: 2,
+                    ),
+                    // ✅ Nettoyer l'erreur quand l'utilisateur tape
+                    onChanged: (v) {
+                      if (errorMessage != null) {
+                        auth.clearUsernameError();
+                      }
+                    },
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Nom d\'utilisateur requis';
+                      }
+                      if (v.trim().length < 3) {
+                        return 'Minimum 3 caractères';
+                      }
+                      if (v.trim().length > 20) {
+                        return 'Maximum 20 caractères';
+                      }
+                      if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(v.trim())) {
+                        return 'Uniquement lettres, chiffres et underscore autorisés';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ✅ Suggestions si le nom est déjà pris
+                  if (suggestions.isNotEmpty) ...[
+                    const Text(
+                      'Suggestions disponibles :',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: suggestions.map((suggestion) {
+                        return ActionChip(
+                          label: Text('@$suggestion'),
+                          avatar: const Icon(Icons.check_circle_outline, size: 16),
+                          onPressed: () => _selectSuggestion(suggestion),
+                          backgroundColor: AppTheme.primaryColor.withOpacity(0.08),
+                          side: BorderSide(
+                            color: AppTheme.primaryColor.withOpacity(0.3),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Info box
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppTheme.primaryColor.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 16, color: AppTheme.primaryColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Votre nom d\'utilisateur sera vérifié avant d\'être changé',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Boutons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _submitting ? null : () => Navigator.pop(context),
+                          child: const Text('Annuler'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _submitting ? null : _checkAndChangeUsername,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: _submitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Valider'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
 }

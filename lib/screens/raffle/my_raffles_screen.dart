@@ -94,146 +94,6 @@ class _MyRafflesScreenState extends State<MyRafflesScreen>
     );
   }
 
-  //@override
- /*  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final isOwner = auth.currentUser?.isStoreOwner ?? false;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mes Tombolas'),
-        actions: [
-          Text('Filtrer', style: TextStyle(color: Colors.white70)),
-          IconButton(
-            icon: Stack(
-              children: [
-                const Icon(Icons.filter_list),
-                if (_statusFilter != null || _sortBy != 'date_desc')
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.secondaryColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            onPressed: _showFilterSheet,
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              final p = context.read<RaffleProvider>();
-              p.fetchMine();
-              p.fetchWins();
-
-              // ✅ Refresh les tombolas créées si owner
-              if (isOwner) {
-                p.fetchMyCreatedRaffles(auth.currentUser!.id);
-              }
-            },
-          ),
-        ],
-        bottom: 
-        PreferredSize(
-          preferredSize: const Size.fromHeight(110),
-          child: Column(
-            children: [
-              // Barre de recherche
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 200, 8),
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Rechercher une tombola...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-              ),
-              TabBar(
-                controller: _tab,
-                indicatorColor: AppTheme.accentColor,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white60,
-                tabs: [
-                  const Tab(text: 'Participations'),
-                  const Tab(text: '🏆 Gagnées'),
-                  if (isOwner) const Tab(text: '📝 Mes Tombolas'),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-      body: Consumer<RaffleProvider>(
-        builder: (_, prov, __) => TabBarView(
-          controller: _tab,
-          children: [
-            _ParticipationsTab(
-              raffles: prov.myRaffles,
-              onRefresh: prov.fetchMine,
-              searchQuery: _searchQuery,
-              statusFilter: _statusFilter,
-              sortBy: _sortBy,
-            ),
-            _WinsTab(
-              raffles: prov.myWins,
-              onRefresh: prov.fetchWins,
-              searchQuery: _searchQuery,
-              sortBy: _sortBy,
-            ),
-            if (isOwner)
-              _CreatedRafflesTab(
-                raffles: prov.myCreatedRaffles,
-                onRefresh: () => prov.fetchMyCreatedRaffles(auth.currentUser!.id),
-                searchQuery: _searchQuery,
-                statusFilter: _statusFilter,
-                sortBy: _sortBy,
-              ),
-          ],
-        ),
-      ),
-      // FAB simplifié - juste vérifier si owner
-      floatingActionButton: isOwner && _currentTabIndex == 2
-        ? FloatingActionButton.extended(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const CreateRaffleScreen(), // ← Sans paramètre
-              ),
-            ).then((_) {
-              // Refresh après création
-              context.read<RaffleProvider>().fetchMyCreatedRaffles(auth.currentUser!.id);
-              context.read<RaffleProvider>().fetchAll();
-            }),
-            icon: const Icon(Icons.add),
-            label: const Text('Créer une tombola'),
-            backgroundColor: AppTheme.secondaryColor,
-          )
-        : null,
-    );
-  }
- */
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -695,19 +555,34 @@ class _ParticipationsTab extends StatelessWidget {
     );
   }
 
-    // Grouper par statut
-    /* final open      = raffles.where((r) => r.status == 'open' || r.status == 'full').toList();
-    final lost      = raffles.where((r) => r.status == 'completed' && r.winnerId != null).toList();
-    final cancelled = raffles.where((r) => r.status == 'cancelled').toList();
- */
-
+   /* 
     final open = filteredRaffles
         .where((r) => r.status == 'open' || r.status == 'full')
         .toList();
     final lost = filteredRaffles
         .where((r) => r.status == 'completed' && r.winnerId != null)
         .toList();
-    final cancelled = filteredRaffles.where((r) => r.status == 'cancelled').toList();
+    final cancelled = filteredRaffles.where((r) => r.status == 'cancelled').toList(); */
+
+    final wonRaffleIds = context.read<RaffleProvider>().myWins.map((r) => r.id).toSet();
+
+  // Tombolas en cours (ouvertes ou pleines)
+  final open = filteredRaffles
+      .where((r) => r.status == 'open' || r.status == 'full')
+      .toList();
+
+  // ✅ CORRECTION : Tombolas perdues = completed ET PAS dans myWins
+  final lost = filteredRaffles
+      .where((r) => 
+          r.status == 'completed' && 
+          !wonRaffleIds.contains(r.id) // ← Tu n'as PAS gagné cette tombola
+      )
+      .toList();
+
+  // Tombolas annulées
+  final cancelled = filteredRaffles
+      .where((r) => r.status == 'cancelled')
+      .toList();
 
     return RefreshIndicator(
       onRefresh: onRefresh,
@@ -735,17 +610,17 @@ class _ParticipationsTab extends StatelessWidget {
                     MaterialPageRoute(
                         builder: (_) => RaffleDetailScreen(raffle: r)),
                   ),
-                label: 'PERDU', labelColor: Colors.grey)),
+                label: 'PERDU', labelColor: Colors.grey, isParticipating: true,)),
           ],
           if (cancelled.isNotEmpty) ...[
-            _sectionTitle('Annulées (${cancelled.length})', Colors.orange),
+            _sectionTitle('Annulées (${cancelled.length})', Colors.red),
             ...cancelled.map((r) => RaffleCard(raffle: r, 
                 onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (_) => RaffleDetailScreen(raffle: r)),
                   ),
-                label: 'ANNULÉ', labelColor: Colors.orange)),
+                label: 'ANNULÉ', labelColor: Colors.red, isParticipating: true,)),
           ],
         ],
       ),
@@ -1129,6 +1004,9 @@ class _ClaimSheetState extends State<_ClaimSheet> {
             const Text('Position de livraison',
                 style: TextStyle(
                     fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+            const Text('Votre localisation doit être activée',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.redAccent)),
             const SizedBox(height: 12),
 
             // Toggle
@@ -1385,9 +1263,8 @@ class _ClaimSheetState extends State<_ClaimSheet> {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
+
 // TAB 3 : TOMBOLAS CRÉÉES (STORE OWNERS ONLY)
-// ═══════════════════════════════════════════════════════════════════════════════
 
 class _CreatedRafflesTab extends StatelessWidget {
   final List<Raffle> raffles;
@@ -1440,37 +1317,6 @@ class _CreatedRafflesTab extends StatelessWidget {
     return filtered;
   }
 
-
-  //@override
-  /* Widget build(BuildContext context) {
-    final filteredRaffles = _applyFilters(raffles);
-
-    if (raffles.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.inbox, size: 64, color: AppTheme.textSecondary),
-            const SizedBox(height: 12),
-            const Text("Vous n'avez créé aucune tombola",
-                style: TextStyle(fontSize: 16, color: AppTheme.textSecondary)),
-            const SizedBox(height: 6),
-            const Text('Appuyez sur + pour en créer une',
-                style: AppTheme.caption),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: onRefresh,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: filteredRaffles.length,
-        itemBuilder: (_, i) => _MyRaffleCard(raffle: filteredRaffles[i]),
-      ),
-    );
-  } */
 
   @override
   Widget build(BuildContext context) {
@@ -1819,11 +1665,11 @@ class _MyRaffleCardGlass extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.6)),
+        border: Border.all(color: Colors.white70),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(0.5),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -1835,7 +1681,7 @@ class _MyRaffleCardGlass extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: Colors.white.withOpacity(0.2),
@@ -1949,13 +1795,21 @@ class _MyRaffleCardGlass extends StatelessWidget {
                             child: Container(
                               height: 8,
                               decoration: BoxDecoration(
-                                border: Border.all(color: AppTheme.primaryColor.withOpacity(0.08)),
+                                border: Border.all(color: AppTheme.getProbabilityColor(raffle.probabilityType).withOpacity(0.08)),
                                 borderRadius: BorderRadius.circular(6),
                                 color: Colors.white.withOpacity(0.2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                               ),
                               child: LinearProgressIndicator(
                                 value: raffle.fillPercentage,
                                 minHeight: 8,
+                                borderRadius: BorderRadius.circular(6),
                                 backgroundColor: Colors.transparent,
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   AppTheme.getProbabilityColor(raffle.probabilityType),
@@ -2000,7 +1854,7 @@ class _MyRaffleCardGlass extends StatelessWidget {
                       if (raffle.isFull && raffle.status == 'open' || raffle.status == 'open')
                         Stack(
                           children: [
-                            // Bouton "Tirer au sort" (en bas à gauche)
+                            // Bouton "Tirer au sort"
                             if (raffle.isFull && raffle.status == 'open')
                               Align(
                                 alignment: Alignment.bottomLeft,
@@ -2008,14 +1862,14 @@ class _MyRaffleCardGlass extends StatelessWidget {
                                   padding: const EdgeInsets.all(0.1),
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      border: AppTheme.getProbabilityColor(raffle.probabilityType).withOpacity(0.6) != null
-                                          ? Border.all(color: AppTheme.getProbabilityColor(raffle.probabilityType).withOpacity(0.6))
+                                      border: Colors.white.withOpacity(0.6) != null
+                                          ? Border.all(color: Colors.white.withOpacity(0.6))
                                           : null,
-                                      color: Colors.white.withOpacity(0.03),
-                                      borderRadius: BorderRadius.circular(6),
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.03),
+                                          color:AppTheme.getProbabilityColor(raffle.probabilityType).withOpacity(0.8),
                                           blurRadius: 2,
                                           offset: const Offset(0, 1),
                                         ),
@@ -2034,7 +1888,7 @@ class _MyRaffleCardGlass extends StatelessWidget {
                                 ),
                               ),
 
-                            // Bouton "Annuler" (en bas à droite - ton code existant)
+                            // Bouton "Annuler" 
                             if (raffle.status == 'open')
                               Align(
                                 alignment: Alignment.bottomRight,
@@ -2042,14 +1896,14 @@ class _MyRaffleCardGlass extends StatelessWidget {
                                   padding: const EdgeInsets.all(0.1),
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      border: Colors.redAccent.withOpacity(0.6) != null
-                                          ? Border.all(color: Colors.redAccent.withOpacity(0.6))
+                                      border: Colors.white.withOpacity(0.6) != null
+                                          ? Border.all(color: Colors.white70.withOpacity(0.6))
                                           : null,
-                                      color: Colors.white.withOpacity(0.03),
-                                      borderRadius: BorderRadius.circular(6),
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.03),
+                                          color: Colors.redAccent.withOpacity(0.4),
                                           blurRadius: 2,
                                           offset: const Offset(0, 1),
                                         ),
@@ -2114,9 +1968,16 @@ class _MyRaffleCardGlass extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: Colors.white.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black87.withOpacity(0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
