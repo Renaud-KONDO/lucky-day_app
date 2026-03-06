@@ -219,11 +219,23 @@ class RaffleProvider with ChangeNotifier {
 
   Future<void> fetchMine() async {
     try {
+      print('🔵 Fetching my raffles...');
       _mine = await _repo.getMyRaffles();
       logger.i("mine raffles get end ! ");
       logger.i("here is the list of raffles and its details : ${_mine.map((r) => 'Raffle: ${r.id}, Status: ${r.status}, Prize: ${r.product?.name}').join('\n')}");
       notifyListeners();
+      print('✅ My raffles fetched successfully: ${_mine.length}');
     } catch (e) {
+      print('❌ Error fetching my raffles: $e');
+
+      if (e is DioException) {
+      print('🔴 DioException status code: ${e.response?.statusCode}');
+      if (e.response?.statusCode == 401) {
+        print('🔴🔴🔴 401 DETECTED IN PROVIDER - Token should expire now');
+      }
+    }
+
+    notifyListeners();
       logger.e("error fetching my raffles: $e");
     }
   }
@@ -283,10 +295,10 @@ class RaffleProvider with ChangeNotifier {
   // PARTICIPATION
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Future<bool> participate(String raffleId) async {
+  Future<bool> participate(String raffleId, String participationType) async {
     _loading = true; _error = null; notifyListeners();
     try {
-      await _repo.participate(raffleId);
+      await _repo.participate(raffleId, participationType);
       await fetchAll(); 
       await fetchMine();
       _loading = false; 
