@@ -31,8 +31,8 @@ class RaffleRepository {
     return Raffle.fromJson(res.data['data']);
   }
 
-  Future<void> participate(String raffleId) async {
-    await _api.post('${AppConstants.raffles}/$raffleId${AppConstants.raffleParticipate}');
+  Future<void> participate(String raffleId, String participationType) async {
+    await _api.post('${AppConstants.raffles}/$raffleId${AppConstants.raffleParticipate}/$participationType');
   }
 
   Future<List<Raffle>> getMyRaffles() async {
