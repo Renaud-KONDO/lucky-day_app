@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:lucky_day/providers/notification_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/user.dart';
 import '../data/services/api_service.dart';
@@ -16,6 +18,7 @@ class AuthProvider with ChangeNotifier {
   bool _loading = false;
   String? _error;
   var logger = Logger();
+  Timer? _notificationTimer;
 
   AuthProvider(this._api) {
     _loadUserFromStorage();
@@ -58,6 +61,12 @@ class AuthProvider with ChangeNotifier {
       // ✅ Enregistrer le token FCM une seule fois après login
       await NotificationService.instance.registerToken();
 
+      // Après login, lance un polling toutes les 30 secondes
+      /* Timer.periodic(const Duration(seconds: 30), (_) {
+        NotificationProvider.fetchUnreadCount();
+      }); */
+      _startNotificationPolling();
+
       _loading = false; notifyListeners();
       return true;
     } catch (e) {
@@ -85,12 +94,37 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+   void _startNotificationPolling() {
+    // Annule le timer précédent s'il existe
+    _notificationTimer?.cancel();
+    
+    // Lance un polling toutes les 30 secondes
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) {
+        // Ne pas attendre la réponse pour ne pas bloquer
+        try {
+          // Accède au provider via un contexte global si disponible
+          // OU passe le NotificationProvider en paramètre à AuthProvider
+        } catch (e) {
+          print('Error polling notifications: $e');
+        }
+      },
+    );
+  }
+  
+  @override
+  void dispose() {
+    _notificationTimer?.cancel();
+    super.dispose();
+  }
+
   Future<bool> register({
     required String email,
     required String password,
     required String fullName,
     String? phone,
-    String? username,  // ← ajouter
+    String? username, 
   }) async {
     _loading = true; _error = null; notifyListeners();
     try {
@@ -115,7 +149,7 @@ class AuthProvider with ChangeNotifier {
       return true;
     } catch (e) {
       final msg = e.toString();
-      if (msg.contains('Username already taken')) {
+      if (msg.contains('Username is already taken')) {
         _error = "Ce nom d'utilisateur est déjà pris";
       } else if (msg.contains('Username')) {
         _error = "Nom d'utilisateur invalide (3-30 caractères, minuscules, _ et chiffres)";
@@ -126,7 +160,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ← Ajouter ces méthodes
+  
   Future<bool> checkUsername(String username) async {
     try {
       final res = await _api.get(
@@ -138,15 +172,107 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  List<String>? usernameSuggestions; 
+
+  /// Changer le nom d'utilisateur
+  Future<bool> changeUsername(String newUsername) async {
+    _error = null;
+    usernameSuggestions = null;
+    notifyListeners();
+
+    try {
+      final res = await _api.post('${AppConstants.changeUsername}/$newUsername');
+      
+      // Refresh le profil pour obtenir le nouveau username
+      await refreshProfile();
+      
+      _error = null;
+      usernameSuggestions = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      print('❌ Change username error: $e');
+      
+      if (e is DioException) {
+        print('Error changing Username ${e.response?.data}');
+        final data = e.response?.data;
+        //final message = data?['message']['message']?.toString() ?? 'Nom d\'utilisateur non disponible';
+        final messageObj = data?['message'];
+
+        // ✅ Récupérer les suggestions du backend
+        
+
+        if (messageObj is Map) {
+        // Si message est un objet avec message et suggestions
+        final errorText = messageObj['message']?.toString() ?? 'Nom d\'utilisateur non disponible';
+        
+        _error = errorText;
+        if (errorText.contains('already taken')) {
+          _error = "Ce nom d'utilisateur est déjà pris";
+        } else if (errorText.contains('invalid')) {
+          _error = "Nom d'utilisateur invalide (3-30 caractères, minuscules, _ et chiffres)";
+        }else{
+          _error = "Nom d'utilisateur non disponible";
+        }
+        //print("✅ Error message parsed: $_error");
+
+        // ✅ Récupérer les suggestions correctement
+        if (messageObj['suggestions'] != null && messageObj['suggestions'] is List) {
+            usernameSuggestions = (messageObj['suggestions'] as List)
+                .map((s) => s.toString())
+                .toList();
+            
+            print("✅ Username Suggestions parsed: $usernameSuggestions");
+          }
+        } else {
+          // Si message est juste une string
+          _error = messageObj?.toString() ?? 'Nom d\'utilisateur non disponible';
+        }
+      } else {
+        _error = 'Erreur de connexion';
+      }
+      
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Nettoyer l'erreur de nom d'utilisateur
+  void clearUsernameError() {
+    _error = null;
+    usernameSuggestions = null;
+    notifyListeners();
+  }
+
+  /// Définir une erreur personnalisée pour le nom d'utilisateur
+  void setUsernameError(String error) {
+    _error = error;
+    usernameSuggestions = null;
+    notifyListeners();
+  }
+
+
+
   Future<List<String>> getSuggestedUsernames(String fullName) async {
     try {
       final res = await _api.post(
         AppConstants.suggestUsernames,
         data: {'fullName': fullName},
       );
-      final list = res.data['data']['suggestions'] as List;
-      return list.map((e) => e.toString()).toList();
-    } catch (_) {
+      
+      
+      if (res.data['data']['suggestions'] != null) {
+        // Ancien format (liste)
+        final list = res.data['data']['suggestions'] as List;
+        return list.map((e) => e.toString()).toList();
+      } else if (res.data['data']['username'] != null) {
+        // Nouveau format (single username)
+        final username = res.data['data']['username'].toString();
+        return [username];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting username suggestions: $e');
       return [];
     }
   }
