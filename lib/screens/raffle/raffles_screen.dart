@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
 import '../../widgets/raffle_card.dart';
 import '../../widgets/winners_banner.dart';
+import '../../widgets/error_view.dart';
 
 class RafflesScreen extends StatefulWidget {
   const RafflesScreen({super.key});
@@ -224,7 +225,7 @@ bool get _hasActiveFilters =>
                 if (prov.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (prov.errorMessage != null) {
+                /* if (prov.errorMessage != null) {
                   return Center(child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -237,6 +238,12 @@ bool get _hasActiveFilters =>
                           child: const Text('Réessayer')),
                     ],
                   ));
+                } */
+               if (prov.errorMessage != null) {
+                  return ErrorView(
+                    message: prov.errorMessage!,
+                    onRetry: () => prov.fetchAll(),
+                  );
                 }
                 return TabBarView(
                   controller: _tab,

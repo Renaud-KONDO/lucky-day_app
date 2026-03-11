@@ -204,7 +204,13 @@ class RaffleProvider with ChangeNotifier {
       logger.i("raffles get end ! ");
     } catch (e) {
       _error = 'Erreur de chargement des tombolas';
-      logger.e("error listing raffles : $e");
+      //logger.e("error listing raffles : $e");
+      if (e is DioException && e.response?.data is Map) {
+        _error = e.response!.data['message']?.toString() ?? 
+                'Une erreur est survenue';
+      } else {
+        _error = 'Une erreur est survenue';
+      }
     }
     _loading = false; notifyListeners();
   }
