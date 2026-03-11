@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:lucky_day/data/services/sse_service.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
@@ -8,6 +11,7 @@ import '../../providers/raffle_provider.dart';
 import '../../widgets/loading_dialog.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../transactions/transactions_screen.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 
@@ -121,6 +125,26 @@ class ProfileScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Column(children: [
 
+                
+                // ✅ Indicateur de connexion SSE
+                Container(
+                  margin: const EdgeInsets.only(top: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: _SSEStatusIndicator(),
+                ),
+                const SizedBox(height: 16),
                 // Solde
                 /* Container(
                   width: double.infinity,
@@ -197,24 +221,23 @@ class ProfileScreen extends StatelessWidget {
                 ]),
                 const SizedBox(height: 24),
 
-                // Menu
-                /*  _sectionTitle('Compte'),
-                _menuItem(Icons.person_outline, 'Mon profil', () {}),
-                _menuItem(Icons.history, 'Historique', () {}),
-                _menuItem(Icons.notifications_outlined, 'Notifications', () {}),
-                _menuItem(Icons.help_outline, 'Aide', () {}),
-                const SizedBox(height: 8),
-                _menuItem(Icons.logout, 'Déconnexion', () async {
-                  await auth.logout();
-                  if (context.mounted) Navigator.pushReplacementNamed(context, '/login');
-                }, color: Colors.red), */
                 _sectionTitle('Compte'),
                 _menuItem(context, Icons.person_outline, 'Mon profil', () =>
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()))),
                 _menuItem(context, Icons.lock_outline, 'Changer le mot de passe', () =>
                   Navigator.push(context,
                     MaterialPageRoute(builder: (_) => const ChangePasswordScreen()))),
-                _menuItem(context, Icons.history, 'Historique des transactions', () {}),
+                //_menuItem(context, Icons.history, 'Historique des transactions', () {}),
+                _menuItem(
+                  context,
+                  Icons.history,
+                  'Historique des transactions',
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const TransactionsScreen()),
+                  ),
+                ),
+                
                 const SizedBox(height: 8),
                 
                 _sectionTitle('Préférences'),
@@ -529,4 +552,134 @@ class ProfileScreen extends StatelessWidget {
         ),
       );
     }
+}
+
+class _SSEStatusIndicator extends StatefulWidget {
+  const _SSEStatusIndicator();
+
+  @override
+  State<_SSEStatusIndicator> createState() => _SSEStatusIndicatorState();
+}
+
+class _SSEStatusIndicatorState extends State<_SSEStatusIndicator> {
+  Timer? _timer;
+  bool _isConnected = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Vérifier l'état toutes les secondes
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _isConnected = SSEService().isConnected;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Icône animée
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (_isConnected ? Colors.green : Colors.grey).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Icon(
+                _isConnected ? Icons.wifi : Icons.wifi_off,
+                color: _isConnected ? Colors.green : Colors.grey,
+                size: 20,
+              ),
+              if (_isConnected)
+                Positioned.fill(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation(
+                      Colors.green.withOpacity(0.3),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+
+        // Texte
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Connexion temps réel',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (_isConnected ? Colors.green : Colors.grey).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _isConnected ? 'LIVE' : 'OFFLINE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: _isConnected ? Colors.green : Colors.grey,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _isConnected
+                    ? 'Mises à jour automatiques activées'
+                    : 'Hors ligne - Rafraîchir manuellement',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textSecondary.withOpacity(0.8),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Bouton d'action
+        if (!_isConnected)
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            onPressed: () {
+              SSEService().connect();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Reconnexion en cours...'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            tooltip: 'Reconnecter',
+          ),
+      ],
+    );
+  }
 }
