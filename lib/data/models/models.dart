@@ -150,6 +150,7 @@ class Raffle {
 
   bool get isFull => currentParticipants >= maxParticipants;
   bool get canParticipate => status == 'open' && !isFull;
+  bool get isCancelled => status == 'cancelled';
   bool get isDrawn => status == 'drawn' || status == 'claimed';
 
   factory Raffle.fromJson(Map<String, dynamic> json) => Raffle(
@@ -215,6 +216,62 @@ class Raffle {
     'autoDrawDelayMinutes': autoDrawDelayMinutes,
     'autoDrawTriggeredAt': autoDrawTriggeredAt?.toIso8601String(),
   }; */
+
+  Raffle copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? raffleType,
+    String? probabilityType,
+    double? entryPrice,
+    int? maxParticipants,
+    int? currentParticipants,
+    String? status,
+    bool? cashOptionAvailable,
+    double? cashAmount,
+    String? winnerId,
+    String? winnerName,
+    String? imageUrl,
+    Product? product,
+    String? storeId,
+    DateTime? drawDate,
+    DateTime? createdAt,
+    String? productCategoryId,
+    String? productCategoryName,
+    bool? autoDrawEnabled,
+    String? autoDrawType,
+    DateTime? autoDrawAt,
+    int? autoDrawDelayMinutes,
+    DateTime? autoDrawTriggeredAt,
+  }) {
+    return Raffle(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      raffleType: raffleType ?? this.raffleType,
+      probabilityType: probabilityType ?? this.probabilityType,
+      entryPrice: entryPrice ?? this.entryPrice,
+      maxParticipants: maxParticipants ?? this.maxParticipants,
+      currentParticipants: currentParticipants ?? this.currentParticipants,
+      status: status ?? this.status,
+      cashOptionAvailable: cashOptionAvailable ?? this.cashOptionAvailable,
+      cashAmount: cashAmount ?? this.cashAmount,
+      winnerId: winnerId ?? this.winnerId,
+      winnerName: winnerName ?? this.winnerName,
+      imageUrl: imageUrl ?? this.imageUrl,
+      product: product ?? this.product,
+      storeId: storeId ?? this.storeId,
+      drawDate: drawDate ?? this.drawDate,
+      createdAt: createdAt ?? this.createdAt,
+      productCategoryId: productCategoryId ?? this.productCategoryId,
+      productCategoryName: productCategoryName ?? this.productCategoryName,
+      autoDrawEnabled: autoDrawEnabled ?? this.autoDrawEnabled,
+      autoDrawType: autoDrawType ?? this.autoDrawType,
+      autoDrawAt: autoDrawAt ?? this.autoDrawAt,
+      autoDrawDelayMinutes: autoDrawDelayMinutes ?? this.autoDrawDelayMinutes,
+      autoDrawTriggeredAt: autoDrawTriggeredAt ?? this.autoDrawTriggeredAt,
+    );
+  }
 }
 
 

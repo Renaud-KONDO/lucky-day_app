@@ -6,6 +6,7 @@ class User {
   final String email;
   final String username;
   final String? phone;
+  final String? country;
   final String? avatar;
   final String role; // gambler, store_owner, admin, super_admin
   final double balance;
@@ -19,6 +20,7 @@ class User {
     required this.email,
     required this.username,
     this.phone,
+    this.country,
     this.avatar,
     this.role = 'gambler',
     this.balance = 0.0,
@@ -47,6 +49,7 @@ class User {
       email: json['email'] ?? '',
       username:    json['username'] ?? '', 
       phone: json['phone'],
+      country: json['country'] ?? json['countryCode'],
       avatar:      json['avatarUrl'] ?? json['avatar_url'] ?? json['avatar'],
       role:        json['role'] ?? 'gambler',                                
       balance: AppUtils.parseDouble(json['wallet']?['balance'] ?? json['balance'] ?? 0),
@@ -62,6 +65,7 @@ class User {
     'email': email,
     'username': username,        
     'phone': phone,
+    'country': country,
     'avatarUrl': avatar,             
     'role': role,                 
     'balance': balance,
@@ -70,12 +74,13 @@ class User {
     'createdAt': createdAt.toIso8601String(),
   };
 
-  User copyWith({String? fullName, String? phone, String? avatar, String? username}) => User(
+  User copyWith({String? fullName, String? phone, String? country, String? avatar, String? username}) => User(
     id: id, email: email, role: role, balance: balance,
     isVerified: isVerified, isActive: isActive, createdAt: createdAt,
     fullName: fullName ?? this.fullName,
     username: username ?? this.username,
     phone: phone ?? this.phone,
+    country: country ?? this.country,
     avatar: avatar ?? this.avatar,
   );
 }

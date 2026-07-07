@@ -79,7 +79,7 @@ class Transaction {
   bool get isRefunded => status == 'refunded';
 
   // Est-ce un crédit (entrée d'argent) ?
-  bool get isCredit => type == 'wallet_credit' || type == 'prize';
+  bool get isCredit => type == 'wallet_credit' || type == 'prize' || type == 'raffle_refund';
   
   // Est-ce un débit (sortie d'argent) ?
   bool get isDebit => type == 'raffle_entry' || type == 'wallet_debit';
@@ -106,6 +106,7 @@ class Transaction {
       case 'pending':
         return 'En attente';
       case 'completed':
+      case 'success':
         return 'Succès';
       case 'failed':
         return 'Échoué';
