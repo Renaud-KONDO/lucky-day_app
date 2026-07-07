@@ -28,11 +28,24 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.0
   http: ^1.1.0
+  lottie: ^3.1.0
+  audioplayers: ^6.1.0
+  country_picker: ^2.0.26
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - lib/assets/images/Lucky_day_logo.png
+    - lib/assets/loaders/
+    - lib/assets/sounds/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "lib/assets/images/Lucky_day_logo_background-free.png"
