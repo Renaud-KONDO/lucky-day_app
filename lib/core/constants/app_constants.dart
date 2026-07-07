@@ -1,5 +1,5 @@
 class AppConstants {
-  static const String baseUrl = 'http://10.241.88.6:5000/api/v1';
+  static const String baseUrl = 'http://10.253.65.6:5000/api/v1';
 
   // Auth
   static const String authRegister = '/auth/register';
@@ -86,6 +86,9 @@ class AppConstants {
   static const String myNotificationsMarkRead = '/my-notifications';  // + /{id}/read
   static const String myNotificationsMarkAllRead = '/my-notifications/mark-all-read';
   
+
+//Payments
+  static const String walletTopup = '/payments/wallet/topup';
 }
 
 class AppStrings {
