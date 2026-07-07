@@ -33,66 +33,7 @@ class TransactionProvider with ChangeNotifier {
   String? get statusFilter => _statusFilter;
 
   /// Récupérer les transactions (refresh)
-  /* Future<void> fetchTransactions({
-    String? type,
-    String? status,
-    DateTime? startDate,
-    DateTime? endDate,
-  }) async {
-    _loading = true;
-    _error = null;
-    _currentPage = 1;
-    _hasMore = true;
-    _typeFilter = type;
-    _statusFilter = status;
-    notifyListeners();
-
-    try {
-      final result = await _repo.getMyTransactions(
-        page: _currentPage,
-        type: type,
-        status: status,
-        startDate: startDate,
-        endDate: endDate,
-      );
-
-      _transactions = result['transactions'] as List<Transaction>;
-      
-      final pagination = result['pagination'] as Map<String, dynamic>;
-      _hasMore = pagination['hasMore'] as bool? ?? false;
-
-      print('✅ Transactions fetched: ${_transactions.length}');
-    } catch (e) {
-      print('❌ Error fetching transactions: $e');
-      _error = 'Erreur lors du chargement des transactions';
-      
-      /* if (e is DioException) {
-        final message = e.response?.data?['message']?.toString();
-        if (message != null) _error = message;
-      } */
-      if (e is DioException) {
-        final statusCode = e.response?.statusCode;
-        final backendMessage = e.response?.data?['message']?.toString() ?? '';
-        final errors = e.response?.data?['errors'];
-        
-        print('📛 Status code: $statusCode');
-        print('📛 Backend message: $backendMessage');
-        print('📛 Errors: $errors');
-        
-        if (backendMessage.isNotEmpty) {
-          _error = backendMessage;
-        } else {
-          _error = 'Error while fetching transactions';
-        }
-      } else {
-        _error = 'Error while fetching transaction. Not a Dio Exception';
-      }
-    }
-
-    _loading = false;
-    notifyListeners();
-  } */
- Future<void> fetchTransactions({
+  Future<void> fetchTransactions({
     String? type,
     String? status,
     DateTime? startDate,

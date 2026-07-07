@@ -8,7 +8,6 @@ import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/constants/app_constants.dart';
-import 'package:logger/logger.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../data/services/upload_service.dart';

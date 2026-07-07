@@ -19,6 +19,8 @@ class _RaffleDetailScreenState extends State<RaffleDetailScreen> {
   int _currentImageIndex = 0;
   bool _isParticipating = false;
   bool _isWon = false;
+  bool _isDrawn = false;
+
 
   @override
   void initState() {
@@ -357,7 +359,8 @@ class _RaffleDetailScreenState extends State<RaffleDetailScreen> {
               ),
             )
           : null, */
-      bottomNavigationBar: !widget.raffle.canParticipate && !_isParticipating && !_isWon
+      
+      /* bottomNavigationBar: !widget.raffle.canParticipate && !_isParticipating && !_isWon
         ? const SizedBox.shrink()
         : Container(
             padding: const EdgeInsets.all(16),
@@ -380,8 +383,50 @@ class _RaffleDetailScreenState extends State<RaffleDetailScreen> {
                         ? _buildWinningBadge()
                         : _buildParticipateButton(),
               ),
-          ),  
-    );
+          ),  */
+          bottomNavigationBar: widget.raffle.status == "cancelled"
+            ? Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: SafeArea(
+                  child: _buildCancelledBadge(),
+                ),
+              )
+            : (!widget.raffle.canParticipate && !_isParticipating && !_isWon)
+                ? const SizedBox.shrink()
+                : Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: SafeArea(
+                      child: !widget.raffle.canParticipate && _isParticipating && !_isWon
+                          ? _buildLostRaffleBadge()
+                          : (widget.raffle.canParticipate && _isParticipating) || (widget.raffle.status == "full" && _isParticipating)
+                              ? _buildParticipatingBadge()
+                              : _isParticipating && _isWon
+                                  ? _buildWinningBadge()
+                                  : _buildParticipateButton(),
+                    ),
+                  ),
+                  
+            );
   }
 
   Widget _buildParticipatingBadge() {
@@ -423,12 +468,7 @@ Widget _buildLostRaffleBadge() {
   return Container(
     padding: const EdgeInsets.symmetric(vertical: 16),
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-        const Color.fromARGB(255, 65, 65, 65).withOpacity(0.4),
-        const Color.fromARGB(255, 59, 59, 59).withOpacity(0.2),
-        ],
-      ),
+      color: AppTheme.primaryColor,
       borderRadius: BorderRadius.circular(16),
       border: Border.all(
         color: AppTheme.primaryColor.withOpacity(0.3),
@@ -438,13 +478,13 @@ Widget _buildLostRaffleBadge() {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.trending_down,
-            color: AppTheme.primaryColor, size: 24),
+        const Icon(Icons.sentiment_very_dissatisfied,
+            color: Colors.white, size: 24),
         const SizedBox(width: 12),
         Text(
           'Tombola Perdue ! Ne perdez pas espoir 🍀',
           style: TextStyle(
-            color: AppTheme.primaryColor,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 16,
           ),
@@ -475,6 +515,30 @@ Widget _buildLostRaffleBadge() {
           const SizedBox(width: 12),
           const Text(
             '🎉 Félicitations ! Vous avez gagné !',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildCancelledBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.red,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.block, color: Colors.white, size: 24),
+          const SizedBox(width: 12),
+          const Text(
+            'Tombola annulée ! participez à d\'autres',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,

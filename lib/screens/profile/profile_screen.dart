@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:lucky_day/core/constants/payment_constants.dart';
 import 'package:lucky_day/data/services/sse_service.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
@@ -14,10 +16,14 @@ import '../notifications/notifications_screen.dart';
 import '../transactions/transactions_screen.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
+import 'package:lottie/lottie.dart';
+import '../../widgets/payment_status_dialog.dart';
+import '../../providers/payment_provider.dart';
 
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+  
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +52,8 @@ class ProfileScreen extends StatelessWidget {
       default:            roleColor = Colors.black;
     }
 
+    Country userCountry = Country.parse(user.country ?? 'TG'); // Default to Togo if null
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -62,7 +70,7 @@ class ProfileScreen extends StatelessWidget {
             ],
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: const BoxDecoration(gradient: AppTheme.blueGoldGradient),
+                decoration: const BoxDecoration(color: AppTheme.primaryColor),
                 child: SafeArea(
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     const SizedBox(height: 24),
@@ -111,7 +119,7 @@ class ProfileScreen extends StatelessWidget {
                         //borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: roleColor.withOpacity(0.6)),
                       ), */
-                      child: Text("✪ compte " + user.roleLabel,
+                      child: Text("✪ compte  ${user.roleLabel}  ${userCountry.flagEmoji}" ,
                         style: TextStyle(color: roleColor, fontSize: 18, fontWeight: FontWeight.bold)),
                     ),
                   ]),
@@ -262,60 +270,6 @@ class ProfileScreen extends StatelessWidget {
                     );
                   },
                 ),  
-
-                /* Consumer<NotificationProvider>(
-                builder: (context, notificationProvider, _) {
-                  final unreadCount = notificationProvider.unreadCount;
-                  
-                  return ListTile(
-                    leading: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        const Icon(Icons.notifications_outlined, color: AppTheme.primaryColor),
-                        if (unreadCount > 0)
-                          Positioned(
-                            right: -6,
-                            top: -6,
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 20,
-                                minHeight: 20,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  unreadCount > 99 ? '99+' : '$unreadCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    title: const Text('Notifications'),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const NotificationsScreen(),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ), */
                 //_menuItem(context, Icons.notifications_outlined, 'Notifications', () {}),
                 _menuItem(context, Icons.help_outline, 'Aide & Support', () {}),
                 _menuItem(context, Icons.info_outline, 'À propos', () {}),
@@ -338,6 +292,97 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
+
+  Future<void> _initiateWalletTopup(
+    BuildContext context,
+    TextEditingController amountCtrl, {required String userCountry}) async {
+    final auth  = context.read<AuthProvider>();
+    final user  = auth.currentUser;
+    final amountText = amountCtrl.text.trim();
+
+    // — Validations —
+    if (amountText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez entrer un montant')),
+      );
+      return;
+    }
+    final amount = double.tryParse(amountText);
+    if (amount == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Montant invalide')),
+      );
+      return;
+    }
+    if (amount < 100) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Montant minimum : 100 XOF')),
+      );
+      return;
+    }
+    if (amount > 1000000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Montant maximum : 1 000 000 XOF')),
+      );
+      return;
+    }
+    if (user?.phone == null || user!.phone!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ajoutez un numero de paiement à votre profil avant de recharger votre portefeuille')),
+      );
+      return;
+    }
+
+    final mode = PaymentModeDetector.detect(
+      localNumber: user.phone,
+      countryCode: userCountry,
+    );
+
+    if (mode == null) {
+      // show error: unrecognized number for this country
+      return;
+    }
+
+    // — Close bottom sheet —
+    Navigator.pop(context);
+
+    // — Show loading dialog —
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PaymentStatusDialog(
+        state: PaymentDialogState.loading,
+      ),
+    );
+
+    // — Call API —
+    final provider = context.read<PaymentProvider>();
+    final success = await provider.initiateTopup(
+      amount: amount,
+      phoneNumber: user.phone,
+      mode : mode,
+    );
+
+    if (!context.mounted) return;
+
+    // — Dismiss loading dialog —
+    Navigator.pop(context);
+
+    // — Show result dialog —
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PaymentStatusDialog(
+        state: success
+            ? PaymentDialogState.success
+            : PaymentDialogState.error,
+        message: success
+            ? '🎉 Votre portefeuille a été rechargé de ${amount.toStringAsFixed(0)} XOF !'
+            : provider.errorMessage ?? 'Une erreur est survenue. Veuillez réessayer.',
+      ),
+    );
+  }
+  
 
   Future<void> _confirmLogout(BuildContext context) async {
     final confirm = await showDialog<bool>(
@@ -372,11 +417,12 @@ class ProfileScreen extends StatelessWidget {
         // Fermer le loader
         LoadingDialog.hide(context);
 
-        // Rediriger vers la page de connexion
-        Navigator.of(context).pushAndRemoveUntil(
+        // Rediriger vers la page de connexion ---- redirection auto
+        /* Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
           (route) => false,
-        );
+        ); */
+        print('✅ [ProfileScreen] Logout successful, waiting for AuthWrapper to handle navigation');
       }
     } catch (e) {
       print('❌ Logout error: $e');
@@ -480,14 +526,17 @@ class ProfileScreen extends StatelessWidget {
 
     void _showTopUpSheet(BuildContext context) {
       final _amountCtrl = TextEditingController();
+      final screenContext = context;
+      final userCountry = context.read<AuthProvider>().currentUser?.country ?? 'TG';
       showModalBottomSheet(
         context: context,
         isScrollControlled: true,
+        useSafeArea: true,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-        builder: (_) => Padding(
+        builder: (sheetContext) => Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
             left: 20, right: 20, top: 20,
           ),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -531,16 +580,11 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
-              onPressed: () {
-                // TODO: appel API wallet/add-money
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Fonctionnalité de paiement bientôt disponible'),
-                    backgroundColor: AppTheme.primaryColor,
-                  ),
-                );
-              },
+             onPressed: () => _initiateWalletTopup(
+                screenContext,
+                _amountCtrl,
+                userCountry: userCountry,
+              ),
               icon: const Icon(Icons.add_card),
               label: const Text('Recharger'),
               style: ElevatedButton.styleFrom(

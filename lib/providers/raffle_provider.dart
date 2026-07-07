@@ -1,156 +1,3 @@
-/* import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
-import '../data/models/models.dart';
-import '../data/repositories/lottery_repository.dart';
-import '../core/constants/app_constants.dart';
-import 'package:logger/logger.dart';
-
-
-class RaffleProvider with ChangeNotifier {
-  final RaffleRepository _repo;
-  List<Raffle> _all = [];
-  List<Raffle> _mine = [];
-  List<Raffle> _wins = [];
-  bool _loading = false;
-  String? _error;
-  var logger = Logger();
-
-
-  RaffleProvider(this._repo);
-
-  List<Raffle> get allRaffles => _all;
-  List<Raffle> get myRaffles  => _mine;
-  List<Raffle> get myWins     => _wins;
-  Map<String, List<Raffle>> _winners = {}; // par probabilityType
-  bool   get isLoading    => _loading;
-  String? get errorMessage => _error;
-
-  List<Raffle> byProbability(String type) =>
-      _all.where((r) => r.probabilityType == type).toList();
-
-  List<Raffle> recentWinners(String type) => _winners[type] ?? [];
-
-  Future<void> fetchAll({String? probabilityType}) async {
-    _loading = true; _error = null; notifyListeners();
-    try {
-      //logger.i("let's get all raffle. raffles get start ! ");
-      _all = await _repo.getAllRaffles(
-        status: AppConstants.raffleStatusOpen,
-        probabilityType: probabilityType,
-      );
-      // Charger les gagnants récents pour chaque type
-      await Future.wait([
-        _fetchWinnersFor(AppConstants.highProbability),
-        _fetchWinnersFor(AppConstants.mediumProbability),
-        _fetchWinnersFor(AppConstants.lowProbability),
-      ]);
-      logger.i("raffles get end ! ");
-    } catch (e) {
-      _error = 'Erreur de chargement des tombolas';
-      logger.e("error listing raffles : $e");
-    }
-    _loading = false; notifyListeners();
-  }
-
-  Future<void> _fetchWinnersFor(String type) async {
-    try {
-      _winners[type] = await _repo.getRecentWinners(probabilityType: type);
-    } catch (_) {
-      _winners[type] = [];
-    }
-  }
-
-  Future<bool> participate(String raffleId) async {
-  _loading = true; _error = null; notifyListeners();
-  try {
-    await _repo.participate(raffleId);
-    await fetchAll(); 
-    await fetchMine();
-    _loading = false; 
-    notifyListeners(); 
-    return true;
-  } catch (e) {
-    // Extraire le message d'erreur du backend
-    String errorMessage = 'Erreur de participation';
-    
-    if (e is DioException) {
-      
-      final backendMessage = e.response?.data?['message']?.toString() ?? '';
-      
-      if (backendMessage.contains('not found')) {
-        errorMessage = 'Tombola introuvable';
-      } else if (backendMessage.contains('not open')) {
-        errorMessage = 'Cette tombola n\'est plus ouverte aux participations';
-      } else if (backendMessage.contains('already full')) {
-        errorMessage = 'Cette tombola est complète';
-      } else if (backendMessage.contains('already participated')) {
-        errorMessage = 'Vous avez déjà participé à cette tombola';
-      } else if (backendMessage.contains('Insufficient')) {
-        errorMessage = 'Solde insuffisant. Rechargez votre portefeuille.';
-      } else if (backendMessage.isNotEmpty) {
-        errorMessage = backendMessage;
-      }else{
-        errorMessage = 'Erreur de participation';
-      }
-    }else {
-      errorMessage = 'Erreur de participation';
-    }
-    
-    _error = errorMessage;
-    _loading = false; 
-    notifyListeners(); 
-    return false;
-  }
-}
-  
-  Future<void> fetchMine() async {
-    try {
-      _mine = await _repo.getMyRaffles();
-      Logger().i("mine raffles get end ! ");
-      Logger().i("here is the list of raffles and its details : ${_mine.map((r) => 'Raffle: ${r.id}, Status: ${r.status}, Prize: ${r.product?.name}').join('\\n')}");
-      notifyListeners();
-    } catch (_) {}
-  }
-
-  Future<void> fetchWins() async {
-    try {
-      _wins = await _repo.getMyWins();
-      notifyListeners();
-    } catch (_) {}
-  }
-
-  Future<bool> claimPrize({
-    required String raffleId,
-    required String claimOption,
-    Map<String, dynamic>? deliveryAddress,
-  }) async {
-    _loading = true; _error = null; notifyListeners();
-    try {
-      await _repo.claimPrize(
-        raffleId: raffleId,
-        claimOption: claimOption,
-        deliveryAddress: deliveryAddress,
-      );
-      await fetchWins();
-      _loading = false; notifyListeners();
-      return true;
-    } catch (e) {
-      final msg = e.toString();
-      if (msg.contains('not authorized'))     _error = "Vous n'êtes pas le gagnant";
-      else if (msg.contains('already'))       _error = 'Prix déjà réclamé';
-      else if (msg.contains('Cash option'))   _error = 'Option cash non disponible';
-      else if (msg.contains('address'))       _error = 'Adresse requise';
-      else                                    _error = 'Erreur de réclamation';
-      _loading = false; notifyListeners();
-      return false;
-    }
-  }
-
-  void clearError() { _error = null; notifyListeners(); }
-}
- */
-
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../data/models/models.dart';
@@ -561,5 +408,127 @@ class RaffleProvider with ChangeNotifier {
   void clearError() { 
     _error = null; 
     notifyListeners(); 
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SSE LOCAL UPDATES (NO API CALLS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Update a raffle locally from SSE event (without API call)
+  void updateRaffleLocally(Map<String, dynamic> raffleData) {
+    final raffleId = raffleData['raffleId'] as String?;
+    if (raffleId == null) {
+      logger.w('updateRaffleLocally: No raffleId provided');
+      return;
+    }
+
+    logger.i('🔄 Updating raffle $raffleId locally');
+
+    bool updated = false;
+
+    // Update in _all
+    final allIndex = _all.indexWhere((r) => r.id == raffleId);
+    if (allIndex != -1) {
+      _all[allIndex] = _updateRaffleFields(_all[allIndex], raffleData);
+      updated = true;
+      logger.i('   ✅ Updated in allRaffles');
+    }
+
+    // Update in _mine
+    final mineIndex = _mine.indexWhere((r) => r.id == raffleId);
+    if (mineIndex != -1) {
+      _mine[mineIndex] = _updateRaffleFields(_mine[mineIndex], raffleData);
+      updated = true;
+      logger.i('   ✅ Updated in myRaffles');
+    }
+
+    // Update in _myCreated
+    final createdIndex = _myCreated.indexWhere((r) => r.id == raffleId);
+    if (createdIndex != -1) {
+      _myCreated[createdIndex] = _updateRaffleFields(_myCreated[createdIndex], raffleData);
+      updated = true;
+      logger.i('   ✅ Updated in myCreatedRaffles');
+    }
+
+    if (updated) {
+      notifyListeners();
+    } else {
+      logger.w('   ⚠️ Raffle $raffleId not found in any list');
+    }
+  }
+
+  /// Update specific raffle fields from SSE data
+  Raffle _updateRaffleFields(Raffle raffle, Map<String, dynamic> data) {
+    return raffle.copyWith(
+      currentParticipants: data['currentParticipants'] as int? ?? raffle.currentParticipants,
+      maxParticipants: data['maxParticipants'] as int? ?? raffle.maxParticipants,
+      status: data['status'] as String? ?? raffle.status,
+    );
+  }
+
+  /// Update raffle status locally (without API call)
+  void updateRaffleStatusLocally(String raffleId, String newStatus) {
+    logger.i('🔄 Updating raffle $raffleId status to $newStatus locally');
+
+    bool updated = false;
+
+    // Update in _all
+    _updateRaffleInList(_all, raffleId, (r) {
+      updated = true;
+      return r.copyWith(status: newStatus);
+    });
+
+    // Update in _mine
+    _updateRaffleInList(_mine, raffleId, (r) {
+      updated = true;
+      return r.copyWith(status: newStatus);
+    });
+
+    // Update in _myCreated
+    _updateRaffleInList(_myCreated, raffleId, (r) {
+      updated = true;
+      return r.copyWith(status: newStatus);
+    });
+
+    if (updated) {
+      notifyListeners();
+      logger.i('   ✅ Status updated successfully');
+    }
+  }
+
+  /// Remove raffle locally (for cancelled raffles, without API call)
+  void removeRaffleLocally(String raffleId) {
+    logger.i('🔄 Removing raffle $raffleId locally');
+
+    final initialAllCount = _all.length;
+    final initialMineCount = _mine.length;
+    final initialCreatedCount = _myCreated.length;
+
+    _all.removeWhere((r) => r.id == raffleId);
+    _mine.removeWhere((r) => r.id == raffleId);
+    _myCreated.removeWhere((r) => r.id == raffleId);
+
+    final removed = (initialAllCount - _all.length) +
+                    (initialMineCount - _mine.length) +
+                    (initialCreatedCount - _myCreated.length);
+
+    if (removed > 0) {
+      notifyListeners();
+      logger.i('   ✅ Raffle removed from $removed list(s)');
+    } else {
+      logger.w('   ⚠️ Raffle $raffleId not found in any list');
+    }
+  }
+
+  /// Helper: Update raffle in a specific list
+  void _updateRaffleInList(
+    List<Raffle> list, 
+    String raffleId, 
+    Raffle Function(Raffle) updateFn
+  ) {
+    final index = list.indexWhere((r) => r.id == raffleId);
+    if (index != -1) {
+      list[index] = updateFn(list[index]);
+    }
   }
 }

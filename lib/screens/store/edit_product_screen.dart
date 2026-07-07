@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 import '../../data/models/models.dart';
 import '../../data/services/api_service.dart';
 import '../../data/services/upload_service.dart';
-import '../../core/theme/app_theme.dart';
-import '../../core/constants/app_constants.dart';
+//import '../../core/theme/app_theme.dart';
+//import '../../core/constants/app_constants.dart';
 import '../../providers/category_provider.dart';
 
 class EditProductScreen extends StatefulWidget {

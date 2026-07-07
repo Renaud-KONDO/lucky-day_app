@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:lucky_day/data/services/sse_service.dart';
 import 'package:lucky_day/screens/raffle/raffle_detail_screen.dart';
 import 'package:provider/provider.dart';
 import '../../data/services/location_service.dart';
@@ -33,6 +34,9 @@ class _MyRafflesScreenState extends State<MyRafflesScreen>
   String? _statusFilter;
   String _sortBy = 'date_desc'; // date_desc, date_asc, price_desc, price_asc
 
+  Set<String> _subscribedRaffleIds = {};
+  bool _sseCallbacksRegistered = false;
+
   @override
   void initState() {
     super.initState();
@@ -61,11 +65,19 @@ class _MyRafflesScreenState extends State<MyRafflesScreen>
       });
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async{
       final p = context.read<RaffleProvider>();
       p.fetchMine();
       p.fetchWins();
-      
+
+      await _subscribeToVisibleRaffles();
+
+      if (!_sseCallbacksRegistered) {
+        _registerSSECallbacks();
+        _sseCallbacksRegistered = true;
+      }
+      //_subscribeToVisibleRaffles();
+
       // Fetch les tombolas créées si owner. désactivé car fait que l'appel se fait juste après le login
       /* if (isOwner) {
         p.fetchMyCreatedRaffles();
@@ -73,8 +85,411 @@ class _MyRafflesScreenState extends State<MyRafflesScreen>
     });
   }
 
+  /* Future<void> _subscribeToVisibleRaffles() async {
+    final raffles = context.read<RaffleProvider>().allRaffles;
+    
+    if (raffles.isEmpty) {
+      print('⚠️ No raffles to subscribe to');
+      return;
+    }
+
+    final raffleIds = raffles.map((r) => r.id).toList();
+    
+    final success = await SSEService().subscribeToRaffles(raffleIds);
+    
+    if (success) {
+      print('✅ Successfully subscribed to ${raffleIds.length} raffles');
+    } else {
+      print('❌ Failed to subscribe to raffles');
+    }
+  } */
+
   @override
-  void dispose() { _tab.dispose(); _searchCtrl.dispose(); super.dispose(); }
+  void dispose() { 
+    _tab.dispose(); 
+    _searchCtrl.dispose();
+    _unsubscribeFromRaffles();
+   //SSEService().unsubscribeFromAllRaffles();
+    super.dispose(); 
+  }
+
+
+  Future<void> _refreshMyRaffles() async {
+    print('🔄 [MyRafflesScreen] Refreshing my raffles...');
+    
+    final p = context.read<RaffleProvider>();
+    await p.fetchMine();
+    await p.fetchWins();
+    
+    final auth = context.read<AuthProvider>();
+    if (auth.currentUser?.isStoreOwner ?? false) {
+      await p.fetchMyCreatedRaffles(auth.currentUser!.id);
+    }
+    
+    // ✅ Sync subscriptions after refresh
+    await _subscribeToVisibleRaffles();
+    await _unsubscribeFromRemovedRaffles();
+    
+    print('✅ [MyRafflesScreen] Refresh complete');
+  }
+
+  Future<void> _unsubscribeFromRemovedRaffles() async {
+    final p = context.read<RaffleProvider>();
+    final currentRaffleIds = [
+      ...p.myRaffles.map((r) => r.id),
+      ...p.myWins.map((r) => r.id),
+      ...p.myCreatedRaffles.map((r) => r.id),
+    ].toSet();
+    
+    final removedRaffleIds = _subscribedRaffleIds.difference(currentRaffleIds).toList();
+    
+    if (removedRaffleIds.isEmpty) {
+      print('✅ [MyRafflesScreen] No raffles to unsubscribe from');
+      return;
+    }
+
+    print('📊 [MyRafflesScreen] Unsubscribing from ${removedRaffleIds.length} removed raffles...');
+    
+    final sse = SSEService();
+    
+    if (!sse.isConnected) {
+      print('⚠️ [MyRafflesScreen] SSE not connected');
+      return;
+    }
+
+    final success = await sse.updateSubscriptions(
+      removeRaffleIds: removedRaffleIds,
+    );
+    
+    if (success) {
+      _subscribedRaffleIds.removeAll(removedRaffleIds);
+      print('✅ [MyRafflesScreen] Unsubscribed from ${removedRaffleIds.length} raffles');
+      print('   Total subscribed: ${_subscribedRaffleIds.length}');
+    }
+  }
+
+  /* Future<void> _subscribeToVisibleRaffles() async {
+    final raffles = context.read<RaffleProvider>().allRaffles;
+    
+    if (raffles.isEmpty) {
+      print('⚠️ [RafflesScreen] No raffles to subscribe to');
+      return;
+    }
+
+    final raffleIds = raffles.map((r) => r.id).toSet();
+    
+    // Nouvelles raffles à ajouter
+    final newRaffleIds = raffleIds.difference(_subscribedRaffleIds).toList();
+    
+    if (newRaffleIds.isNotEmpty) {
+      print('📊 [RafflesScreen] Subscribing to ${newRaffleIds.length} new raffles...');
+      
+      final success = await SSEService().updateSubscriptions(
+        addRaffleIds: newRaffleIds,
+      );
+      
+      if (success) {
+        _subscribedRaffleIds.addAll(newRaffleIds);
+        print('✅ [RafflesScreen] Subscribed to ${newRaffleIds.length} raffles');
+        print('   Total subscribed: ${_subscribedRaffleIds.length}');
+      }
+    }
+  } */
+  Future<void> _subscribeToVisibleRaffles() async {
+    final p = context.read<RaffleProvider>();
+    
+    // ✅ Collect raffles from all tabs
+    final allVisibleRaffleIds = [
+      ...p.myRaffles.map((r) => r.id),
+      ...p.myWins.map((r) => r.id),
+      ...p.myCreatedRaffles.map((r) => r.id),
+    ].toSet();
+    
+    if (allVisibleRaffleIds.isEmpty) {
+      print('⚠️ [MyRafflesScreen] No raffles to subscribe to');
+      return;
+    }
+
+    print('📊 [MyRafflesScreen] Available raffles: ${allVisibleRaffleIds.length}');
+    print('   Already subscribed: ${_subscribedRaffleIds.length}');
+    
+    final newRaffleIds = allVisibleRaffleIds.difference(_subscribedRaffleIds).toList();
+    
+    if (newRaffleIds.isEmpty) {
+      print('✅ [MyRafflesScreen] Already subscribed to all raffles');
+      return;
+    }
+
+    print('📊 [MyRafflesScreen] Subscribing to ${newRaffleIds.length} new raffles...');
+    
+    final success = await SSEService().updateSubscriptions(
+      addRaffleIds: newRaffleIds,
+    );
+    
+    if (success) {
+      _subscribedRaffleIds.addAll(newRaffleIds);
+      print('✅ [MyRafflesScreen] Subscribed to ${newRaffleIds.length} raffles');
+      print('   Total subscribed: ${_subscribedRaffleIds.length}');
+    } else {
+      print('❌ [MyRafflesScreen] Failed to subscribe');
+    }
+  }
+
+  /// ✅ Se désabonner des raffles qui ne sont plus visibles
+  Future<void> _unsubscribeFromRaffles() async {
+    if (_subscribedRaffleIds.isEmpty) return;
+    
+    print('🔻 [RafflesScreen] Unsubscribing from ${_subscribedRaffleIds.length} raffles...');
+    
+    await SSEService().updateSubscriptions(
+      removeRaffleIds: _subscribedRaffleIds.toList(),
+    );
+    
+    _subscribedRaffleIds.clear();
+    print('✅ [RafflesScreen] Unsubscribed from all raffles');
+  }
+
+  /// ✅ Enregistrer les callbacks SSE pour les événements raffle
+  void _registerSSECallbacks() {
+    print('📡 [RafflesScreen] Registering SSE callbacks...');
+    
+    final sse = SSEService();
+
+    // ── Raffle Update ──
+    sse.onRaffleUpdate = (data) {
+      if (!mounted) return;
+      final eventData = data['data'] as Map<String, dynamic>? ?? data;
+      print('🎲 [RafflesScreen] Raffle updated: $data');
+      
+      // Rafraîchir toutes les listes
+      //context.read<RaffleProvider>().fetchAll();
+      context.read<RaffleProvider>().updateRaffleLocally(eventData);
+    };
+
+    // ── New Participant ──
+    sse.onNewParticipant = (data) {
+      if (!mounted) return;
+      final eventData = data['data'] as Map<String, dynamic>? ?? data;
+      print('👤 [RafflesScreen] New participant: $data');
+      
+      final raffleId = data['raffleId'] as String?;
+      final participantName = data['participantName'] as String?;
+      final currentCount = data['currentParticipants'] as int?;
+      final maxCount = data['maxParticipants'] as int?;
+      
+      // ✅ Rafraîchir IMMÉDIATEMENT
+      //context.read<RaffleProvider>().fetchAll();
+      context.read<RaffleProvider>().updateRaffleLocally(eventData);
+      
+      // Notification légère (seulement si ce n'est pas moi)
+      final auth = context.read<AuthProvider>();
+      final myUserId = auth.currentUser?.id;
+      final participantId = data['participantId'] as String?;
+      
+      if (participantId != null && participantId != myUserId) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '👤 ${participantName ?? "Un participant"} a rejoint ($currentCount/$maxCount)'
+            ),
+            backgroundColor: AppTheme.primaryColor,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    };
+
+    // ── Status Change ──
+    sse.onRaffleStatusChange = (data) {
+      if (!mounted) return;
+      print('📊 [RafflesScreen] Raffle status changed: $data');
+      
+      final raffleTitle = data['raffleTitle'] as String?;
+      final newStatus = data['newStatus'] as String?;
+      final oldStatus = data['oldStatus'] as String?;
+      
+      context.read<RaffleProvider>().fetchAll();
+      
+      // Notification si la raffle devient complète
+      if (newStatus == 'full' && oldStatus != 'full') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ ${raffleTitle ?? "Une tombola"} est complète !'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    };
+
+    // ── Winner Drawn ──
+    sse.onWinnerDrawn = (data) {
+      if (!mounted) return;
+      print('🏆 [RafflesScreen] Winner drawn: $data');
+      
+      final winnerId = data['winnerId'] as String?;
+      final winnerName = data['winnerName'] as String?;
+      final raffleTitle = data['raffleTitle'] as String?;
+      final productName = data['productName'] as String?;
+      final auth = context.read<AuthProvider>();
+      
+      context.read<RaffleProvider>().fetchAll();
+      context.read<RaffleProvider>().fetchMine();
+      context.read<RaffleProvider>().fetchWins();
+      
+      // Si je suis le gagnant
+      if (winnerId == auth.currentUser?.id) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: Colors.white,
+            title: Column(
+              children: [
+                const Icon(Icons.emoji_events, color: Colors.amber, size: 64),
+                const SizedBox(height: 16),
+                const Text(
+                  '🎉 FÉLICITATIONS ! 🎉',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Vous avez gagné :',
+                  style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.goldGradient,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    productName ?? raffleTitle ?? 'Votre lot',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Rendez-vous dans "Mes Gains" pour réclamer votre prix !',
+                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Plus tard'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  // TODO: Navigation vers Mes Gains
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.secondaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Voir mes gains'),
+              ),
+            ],
+          ),
+        );
+      }
+      // Sinon notification simple
+      else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🏆 ${winnerName ?? "Le gagnant"} a remporté : ${raffleTitle ?? "la tombola"}'),
+            backgroundColor: AppTheme.primaryColor,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    };
+
+    // ── Raffle Cancelled ──
+    sse.onRaffleCancelled = (data) {
+      if (!mounted) return;
+      print('❌ [RafflesScreen] Raffle cancelled: $data');
+      
+      final raffleTitle = data['raffleTitle'] as String?;
+      final reason = data['reason'] as String?;
+      
+      context.read<RaffleProvider>().fetchAll();
+      context.read<RaffleProvider>().fetchMine();
+      
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.cancel, color: Colors.orange, size: 28),
+              SizedBox(width: 12),
+              Text('Tombola annulée'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                raffleTitle ?? 'Une tombola a été annulée',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (reason != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'Raison : $reason',
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                ),
+              ],
+              const SizedBox(height: 12),
+              const Text(
+                'Votre paiement sera remboursé automatiquement.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    };
+
+    // ── Raffle Completed ──
+    sse.onRaffleCompleted = (data) {
+      if (!mounted) return;
+      print('✅ [RafflesScreen] Raffle completed: $data');
+      
+      context.read<RaffleProvider>().fetchAll();
+      context.read<RaffleProvider>().fetchMine();
+    };
+
+    print('✅ [RafflesScreen] SSE callbacks registered');
+  }
 
   void _showFilterSheet() {
     showModalBottomSheet(

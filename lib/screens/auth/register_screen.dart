@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+/* import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/app_theme.dart';
+//import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -17,10 +17,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
-  bool _checkingUsername = false;
+  //bool _checkingUsername = false;
   bool _usernameAvailable = false;
-  List<String> _suggestions = [];
-  String? _suggestion;
+  //List<String> _suggestions = [];
+  //String? _suggestion;
 
   @override
   void dispose() {
@@ -36,7 +36,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (mounted) {
       setState(() => _suggestions = suggestions);
     }
-  } */
+  } 
 
   void _onNameChanged() async {
     if (_nameCtrl.text.trim().length < 3) {
@@ -68,7 +68,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _usernameAvailable = available;
       });
     }
-  }
+  }*/
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
@@ -238,6 +238,286 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
+    );
+  }
+} */
+
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:country_picker/country_picker.dart';
+import '../../providers/auth_provider.dart';
+import '../../core/constants/supported_countries.dart';
+
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _formKey      = GlobalKey<FormState>();
+  final _nameCtrl     = TextEditingController();
+  final _emailCtrl    = TextEditingController();
+  final _phoneCtrl    = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
+  bool _obscure = true;
+  bool _usernameAvailable = false;
+  bool _obscureConfirm = true;
+
+  // Country picker state — default: Togo
+  Country _selectedCountry = Country(
+    phoneCode: '228',
+    countryCode: 'TG',
+    e164Sc: 0,
+    geographic: true,
+    level: 1,
+    name: 'Togo',
+    example: '90123456',
+    displayName: 'Togo (TG) [+228]',
+    displayNameNoCountryCode: 'Togo (TG)',
+    e164Key: '228-TG-0',
+  );
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose(); _emailCtrl.dispose(); _phoneCtrl.dispose();
+    _usernameCtrl.dispose(); _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
+    super.dispose();
+  }
+
+  void _openCountryPicker() {
+    showCountryPicker(
+      context: context,
+      countryFilter: SupportedCountries.codes,
+      showPhoneCode: true,
+      favorite: [SupportedCountries.defaultCode],
+      onSelect: (Country country) {
+        setState(() => _selectedCountry = country);
+      },
+      countryListTheme: CountryListThemeData(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        inputDecoration: InputDecoration(
+          labelText: 'Rechercher',
+          prefixIcon: const Icon(Icons.search),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_usernameCtrl.text.isNotEmpty && !_usernameAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Ce nom d'utilisateur n'est pas disponible"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    //final fullPhone = '+${_selectedCountry.phoneCode}${_phoneCtrl.text.trim()}';
+
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.register(
+      fullName: _nameCtrl.text.trim(),
+      email:    _emailCtrl.text.trim(),
+      password: _passwordCtrl.text,
+      phone:    _phoneCtrl.text.trim(),
+      country:  _selectedCountry.countryCode,
+      username: _usernameCtrl.text.trim().isEmpty ? null : _usernameCtrl.text.trim(),
+    );
+
+    /* if (ok && mounted) {
+      Navigator.pushReplacementNamed(context, '/home');
+    } else  */if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(auth.errorMessage ?? 'Erreur'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    return Scaffold(
+      appBar: AppBar(title: const Text("Créer un compte")),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height -
+                    AppBar().preferredSize.height -
+                    MediaQuery.of(context).padding.top,
+              ),
+              child: IntrinsicHeight(
+                child: Form(
+                  key: _formKey,
+                  child: Column(children: [
+                    const SizedBox(height: 16),
+
+                    // Nom complet
+                    TextFormField(
+                      controller: _nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom complet',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      validator: (v) => v == null || v.trim().length < 2
+                          ? '2 caractères minimum' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Email
+                    TextFormField(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) => v == null || !v.contains('@')
+                          ? 'Email invalide' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Country + Phone row
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Country selector button
+                        GestureDetector(
+                          onTap: _openCountryPicker,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 16),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade400),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _selectedCountry.flagEmoji,
+                                  style: const TextStyle(fontSize: 22),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '+${_selectedCountry.phoneCode}',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(Icons.arrow_drop_down, size: 18),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+
+                        // Phone number input
+                        Expanded(
+                          child: TextFormField(
+                            controller: _phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: const InputDecoration(
+                              labelText: 'Numéro de téléphone',
+                              hintText: '90123456',
+                            ),
+                            validator: (v) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Numéro requis';
+                              }
+                              if (!RegExp(r'^[0-9]{8,15}$').hasMatch(v.trim())) {
+                                return '8 chiffres requis';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Mot de passe
+                    TextFormField(
+                      controller: _passwordCtrl,
+                      obscureText: _obscure,
+                      decoration: InputDecoration(
+                        labelText: 'Mot de passe',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                              _obscure ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () =>
+                              setState(() => _obscure = !_obscure),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.length < 8) return '8 caractères minimum';
+                        if (!v.contains(RegExp(r'[A-Z]'))) return 'Au moins une majuscule';
+                        if (!v.contains(RegExp(r'[0-9]'))) return 'Au moins un chiffre';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    // Confirmation mot de passe
+                    TextFormField(
+                      controller: _confirmPasswordCtrl,
+                      obscureText: _obscureConfirm,
+                      decoration: InputDecoration(
+                        labelText: 'Confirmer le mot de passe',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Veuillez confirmer le mot de passe';
+                        if (v != _passwordCtrl.text) return 'Les mots de passe ne correspondent pas';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Bouton inscription
+                    ElevatedButton(
+                      onPressed: auth.isLoading ? null : _submit,
+                      child: auth.isLoading
+                          ? const SizedBox(
+                              width: 24, height: 24,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : const Text("S'inscrire",
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Déjà un compte ? Se connecter'),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      )
     );
   }
 }

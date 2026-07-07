@@ -366,11 +366,15 @@ class _StatusChip extends StatelessWidget {
     switch (status) {
       case 'completed':
         color = Colors.green;
-        label = 'Succes';
+        label = 'Succès';
         break;
       case 'pending':
         color = Colors.orange;
         label = 'En attente';
+        break;
+      case 'refunded':
+        color = AppTheme.primaryColor;
+        label = 'Remboursé';
         break;
       case 'failed':
         color = Colors.red;
@@ -525,6 +529,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               _FilterChip('Tous', null),
               _FilterChip('Terminé', 'completed'),
               _FilterChip('En attente', 'pending'),
+              _FilterChip('Remboursements', 'refunded'),
               _FilterChip('Échoué', 'failed'),
             ],
           ),
